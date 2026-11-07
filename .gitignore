@@ -1,0 +1,12 @@
+.DS_Store
+xcuserdata/
+*.xcodeproj
+DerivedData/
+.build/
+
+# 🔴 签名密钥与证书，绝不入库
+*.p8
+*.p12
+*.mobileprovision
+*.cer
+AuthKey_*

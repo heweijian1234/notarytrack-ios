@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Xcode 16 用 app-store-connect；若 runner 报 method 无效则改回 app-store -->
+	<key>method</key>
+	<string>app-store-connect</string>
+	<key>signingStyle</key>
+	<string>automatic</string>
+	<!-- 无签名archive不含Team信息，export侧官方字段显式指定（修复 No Team Found in Archive） -->
+	<key>teamID</key>
+	<string>FZYVPK6336</string>
+	<key>uploadSymbols</key>
+	<true/>
+	<key>stripSwiftSymbols</key>
+	<true/>
+	<key>compileBitcode</key>
+	<false/>
+	<key>destination</key>
+	<string>export</string>
+	<key>manageAppVersionAndBuildNumber</key>
+	<false/>
+</dict>
+</plist>
