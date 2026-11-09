@@ -953,22 +953,7 @@ struct MonthCalendarView: View {
                 HStack(spacing: 0) {
                     ForEach(Array(row.enumerated()), id: \.offset) { ci, cellOpt in
                         if let date = cellOpt {
-                            let df = DateFormatter()
-                            df.dateFormat = "yyyy-MM-dd"
-                            let isBooked = bookedDays.contains(df.string(from: date))
-                            let isToday = Calendar.current.isDateInToday(date)
-                            VStack(spacing: 2) {
-                                Text("\(Calendar.current.component(.day, from: date))")
-                                    .font(.caption)
-                                    .foregroundColor(isToday ? .white : .primary)
-                                    .frame(width: 26, height: 26)
-                                    .background(Circle().fill(isToday ? Color.indigo : Color.clear))
-                                // 有预约=橙点（健哥令③）
-                                Circle()
-                                    .fill(isBooked ? Color.orange : Color.clear)
-                                    .frame(width: 5, height: 5)
-                            }
-                            .frame(maxWidth: .infinity, minHeight: 34)
+                            dayCell(date)
                         } else {
                             Text("").frame(maxWidth: .infinity, minHeight: 34)
                         }
@@ -983,5 +968,24 @@ struct MonthCalendarView: View {
         if let m = Calendar.current.date(byAdding: .month, value: n, to: selectedMonth) {
             selectedMonth = m
         }
+    }
+
+    /// 单日格子（有预约=橙点；今天=靛蓝圆）
+    private func dayCell(_ date: Date) -> some View {
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        let isBooked = bookedDays.contains(df.string(from: date))
+        let isToday = Calendar.current.isDateInToday(date)
+        return VStack(spacing: 2) {
+            Text("\(Calendar.current.component(.day, from: date))")
+                .font(.caption)
+                .foregroundColor(isToday ? .white : .primary)
+                .frame(width: 26, height: 26)
+                .background(Circle().fill(isToday ? Color.indigo : Color.clear))
+            Circle()
+                .fill(isBooked ? Color.orange : Color.clear)
+                .frame(width: 5, height: 5)
+        }
+        .frame(maxWidth: .infinity, minHeight: 34)
     }
 }
