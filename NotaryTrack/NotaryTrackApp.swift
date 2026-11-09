@@ -771,7 +771,7 @@ struct OverdueListView: View {
         List {
             Section {
                 LabeledRow("逾期单数", "\(overdue.count) 单")
-                LabeledRow("逾期合计", "$\(total, specifier: \"%.0f\")")
+                LabeledRow("逾期合计", "$\(total, specifier: "%.0f")")
             }
             Section("逐单处理") {
                 ForEach(overdue.sorted { $0.unpaidDays > $1.unpaidDays }) { s in
@@ -794,7 +794,7 @@ struct OverdueRow: View {
             HStack {
                 Text(client?.company ?? "未知客户").font(.headline)
                 Spacer()
-                Text("$\(signing.fee, specifier: \"%.0f\")").font(.headline)
+                Text("$\(signing.fee, specifier: "%.0f")").font(.headline)
             }
             HStack {
                 // 账龄色标
