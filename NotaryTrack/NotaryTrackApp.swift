@@ -385,6 +385,9 @@ struct SigningListView: View {
             .sheet(isPresented: $showAdd, onDismiss: { data = Store.load() }) {
                 SigningEditor(data: $data, preselectedClientId: nil)
             }
+            .sheet(isPresented: $showExport, onDismiss: { exportText = nil }) {
+                ShareSheet(items: [exportText ?? ""])
+            }
         }
     }
 
@@ -821,5 +824,164 @@ struct OverdueRow: View {
             }
         }
         .padding(.vertical, 2)
+    }
+}
+
+
+// MARK: - 导出（健哥令②：单签署单/本月总结 导出成文本）
+
+enum NTExporter {
+    static func signingText(_ s: Signing, client: Client?, settings: AppSettings) -> String {
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd HH:mm"
+        df.locale = Locale(identifier: "zh_CN")
+        var l: [String] = []
+        l.append("【签署单】\(client?.company ?? "未知客户")")
+        l.append("时间：\(df.string(from: s.date))")
+        if !s.address.isEmpty { l.append("地点：\(s.address)") }
+        l.append("类型：\(s.serviceType.rawValue)")
+        l.append("总费用：$\(s.fee, specifier: "%.0f")（公证费免税 $\(s.notaryFeePortion, specifier: "%.0f") + 服务费应税 $\(s.taxablePortion, specifier: "%.0f")）")
+        if s.tripFee > 0 { l.append("跑趟费：$\(s.tripFee, specifier: "%.0f")") }
+        l.append("里程：\(s.mileage, specifier: "%.1f") mi（抵税 $\(s.mileage * settings.mileageRate, specifier: "%.0f")）")
+        l.append("耗材：$\(settings.supplyCostPerSigning, specifier: "%.2f")")
+        l.append("净利：$\(s.netProfit, specifier: "%.2f") / 时薪 $\(s.hourlyNet, specifier: "%.0f")")
+        l.append("状态：\(s.status == .done ? "完成" : s.status == .noshow ? "没成功" : "已约") · \(s.paid ? "已收" : "未收")")
+        l.append("公证行为：借款 \(s.borrowDocs) / 信托 \(s.trustDocs) / 其他 \(s.otherDocs)")
+        if !s.note.isEmpty { l.append("备注：\(s.note)") }
+        return l.joined(separator: "
+")
+    }
+
+    static func monthText(data: Store.Data) -> String {
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        let cal = Calendar.current
+        let done = data.signings.filter { $0.status == .done && cal.isDate($0.date, equalTo: Date(), toGranularity: .month) }
+        var l: [String] = []
+        l.append("【本月签署单总结】\(df.string(from: Date()))")
+        l.append(String(repeating: "=", count: 30))
+        let income = done.reduce(0) { $0 + $1.fee }
+        let notary = done.reduce(0) { $0 + $1.notaryFeePortion }
+        let miles = done.reduce(0) { $0 + $1.mileage }
+        let net = done.reduce(0) { $0 + $1.netProfit }
+        l.append("单数：\(done.count)")
+        l.append("总收入：$\(income, specifier: "%.0f")")
+        l.append("  其中公证费（SE 免税）：$\(notary, specifier: "%.0f")")
+        l.append("  其中服务费（应税）：$\(income - notary, specifier: "%.0f")")
+        l.append("总里程：\(miles, specifier: "%.0f") mi（抵税 $\(miles * data.settings.mileageRate, specifier: "%.0f")）")
+        l.append("总净利：$\(net, specifier: "%.0f")")
+        let unpaid = data.signings.filter { $0.status == .done && !$0.paid }
+        if !unpaid.isEmpty {
+            l.append("⚠️ 未收款 \(unpaid.count) 单，合计 $\(unpaid.reduce(0) { $0 + $1.fee }, specifier: "%.0f")：")
+            for u in unpaid {
+                l.append("  - \(data.clients.first { $0.id == u.clientId }?.company ?? "?") $\(u.fee, specifier: "%.0f")（\(u.unpaidDays) 天）")
+            }
+        }
+        l.append("")
+        l.append("——逐单明细——")
+        for s in done.sorted(by: { $0.date < $1.date }) {
+            let cn = data.clients.first { $0.id == s.clientId }?.company ?? "?"
+            l.append("\(df.string(from: s.date)) \(cn) $\(s.fee, specifier: "%.0f") \(s.mileage, specifier: "%.0f")mi \(s.paid ? "已收" : "未收")")
+        }
+        return l.joined(separator: "
+")
+    }
+}
+
+
+// MARK: - 系统分享面板（导出用）
+
+struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+
+// MARK: - 月历（健哥令③：有预约的日子变色）
+
+struct MonthCalendarView: View {
+    let bookedDays: Set<String>
+    @Binding var selectedMonth: Date
+
+    private var monthDays: [Date?] {
+        let cal = Calendar.current
+        guard let interval = cal.dateInterval(of: .month, for: selectedMonth) else { return [] }
+        let firstWeekday = cal.component(.weekday, from: interval.start)  // 1=日
+        let daysInMonth = cal.range(of: .day, in: .month, for: selectedMonth)?.count ?? 30
+        var cells: [Date?] = Array(repeating: nil, count: firstWeekday - 1)
+        for d in 1...daysInMonth {
+            if let date = cal.date(byAdding: .day, value: d - 1, to: interval.start) {
+                cells.append(date)
+            }
+        }
+        return cells
+    }
+
+    private var monthTitle: String {
+        let df = DateFormatter()
+        df.dateFormat = "yyyy年M月"
+        df.locale = Locale(identifier: "zh_CN")
+        return df.string(from: selectedMonth)
+    }
+
+    var body: some View {
+        VStack(spacing: 6) {
+            HStack {
+                Button { shiftMonth(-1) } label: { Image(systemName: "chevron.left") }
+                Spacer()
+                Text(monthTitle).font(.headline)
+                Spacer()
+                Button { shiftMonth(1) } label: { Image(systemName: "chevron.right") }
+            }
+            let weekdays = ["日", "一", "二", "三", "四", "五", "六"]
+            HStack(spacing: 0) {
+                ForEach(weekdays, id: \.self) { w in
+                    Text(w).font(.caption2).foregroundColor(.secondary).frame(maxWidth: .infinity)
+                }
+            }
+            var rows: [[Date?]] = []
+            var cur: [Date?] = []
+            for cell in monthDays {
+                cur.append(cell)
+                if cur.count == 7 { rows.append(cur); cur = [] }
+            }
+            if !cur.isEmpty { rows.append(cur) }
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                HStack(spacing: 0) {
+                    ForEach(0..<7, id: \.self) { i in
+                        if i < row.count, let date = row[i] {
+                            let df = DateFormatter()
+                            df.dateFormat = "yyyy-MM-dd"
+                            let isBooked = bookedDays.contains(df.string(from: date))
+                            let isToday = Calendar.current.isDateInToday(date)
+                            VStack(spacing: 2) {
+                                Text("\(Calendar.current.component(.day, from: date))")
+                                    .font(.caption)
+                                    .foregroundColor(isToday ? .white : .primary)
+                                    .frame(width: 26, height: 26)
+                                    .background(Circle().fill(isToday ? Color.indigo : Color.clear))
+                                // 有预约=橙点（健哥令③）
+                                Circle()
+                                    .fill(isBooked ? Color.orange : Color.clear)
+                                    .frame(width: 5, height: 5)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 34)
+                        } else {
+                            Text("").frame(maxWidth: .infinity, minHeight: 34)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 4)
+    }
+
+    private func shiftMonth(_ n: Int) {
+        if let m = Calendar.current.date(byAdding: .month, value: n, to: selectedMonth) {
+            selectedMonth = m
+        }
     }
 }

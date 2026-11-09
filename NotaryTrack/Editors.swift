@@ -11,19 +11,19 @@ struct SigningEditor: View {
     @State private var clientId: UUID?
     @State private var date = Date()
     @State private var address = ""
-    @State private var fee = 100.0
+    @State private var fee = 0.0              // 健哥令①：不预填
     @State private var notaryFeePortion = 0.0
     @State private var tripFee = 0.0
     @State private var mileage = 0.0
     @State private var minutes = 60
     @State private var buffer = 15
     @State private var serviceType: ServiceType = .loan
-    @State private var borrowDocs = 1
+    @State private var borrowDocs = 0         // 健哥令①：默认 0
     @State private var trustDocs = 0
     @State private var otherDocs = 0
-    @State private var supplyCost = 2.50      // 健哥令②：耗材成本自填
-    @State private var remindMe = true        // 健哥令②：提醒开关
-    @State private var remindHoursBefore = 2  // 提前小时数
+    @State private var supplyCost = 2.50
+    @State private var remindMe = false       // 健哥令①：默认关，用户自己开
+    @State private var remindMinutesBefore = 30 // 健哥令①：分钟制（30/45/60/120/180/240/360/600）
     @State private var notaryFeeHint = "打包价通常 $0"
     @State private var note = ""
 
@@ -72,12 +72,30 @@ struct SigningEditor: View {
                     DatePicker("时间", selection: $date)
                     TextField("签署地点（房产地址）", text: $address)
                     Stepper("桌上 \(minutes) 分钟", value: $minutes, in: 15...240, step: 15)
+                    // 健哥令①：闹钟放车程缓冲下面
                     Stepper("车程缓冲 \(buffer) 分钟", value: $buffer, in: 0...60, step: 5)
+                    Toggle("提醒（闹钟）", isOn: $remindMe)
+                    if remindMe {
+                        // 健哥令①：30/45 分钟加入
+                        Picker("提前", selection: $remindMinutesBefore) {
+                            Text("提前 30 分钟").tag(30)
+                            Text("提前 45 分钟").tag(45)
+                            Text("提前 1 小时").tag(60)
+                            Text("提前 2 小时").tag(120)
+                            Text("提前 3 小时").tag(180)
+                            Text("提前 4 小时").tag(240)
+                            Text("提前 6 小时").tag(360)
+                            Text("提前 10 小时").tag(600)
+                        }
+                        Text("预约前 \(remindMinutesBefore >= 60 ? "\(remindMinutesBefore / 60) 小时" : "\(remindMinutesBefore) 分钟")通知你出发。")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
                 Section("费用与里程") {
                     HStack {
                         Text("总费用 $")
-                        TextField("100", value: $fee, format: .number)
+                        TextField("0", value: $fee, format: .number)
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                     }
@@ -115,23 +133,6 @@ struct SigningEditor: View {
                     Stepper("借款合同 \(borrowDocs) 份", value: $borrowDocs, in: 0...20)
                     Stepper("信托文件 \(trustDocs) 份", value: $trustDocs, in: 0...20)
                     Stepper("其他 \(otherDocs) 份", value: $otherDocs, in: 0...20)
-                }
-                // 健哥令②：闹钟提醒（开关+提前量）
-                Section("提醒（闹钟）") {
-                    Toggle("提前提醒我出发", isOn: $remindMe)
-                    if remindMe {
-                        Picker("提前", selection: $remindHoursBefore) {
-                            Text("提前 1 小时").tag(1)
-                            Text("提前 2 小时").tag(2)
-                            Text("提前 3 小时").tag(3)
-                            Text("提前 4 小时").tag(4)
-                            Text("提前 6 小时").tag(6)
-                            Text("提前 10 小时").tag(10)
-                        }
-                        Text("预约前 \(remindHoursBefore) 小时通知你出发（桌上 \(minutes) 分钟 + 车程 \(buffer) 分钟）。")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
                 }
                 Section("备注") {
                     TextField("订单号/特殊要求…", text: $note, axis: .vertical)
@@ -171,17 +172,17 @@ struct SigningEditor: View {
         dismiss()
     }
 
-    /// 本地通知：预约前 remindHoursBefore 小时
+    /// 本地通知：预约前 remindMinutesBefore 分钟
     private func scheduleLocalReminder() {
         guard remindMe else { return }
         let center = UNUserNotificationCenter.current()
         center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
             guard granted else { return }
-            let triggerDate = date.addingTimeInterval(-Double(remindHoursBefore) * 3600)
+            let triggerDate = date.addingTimeInterval(-Double(remindMinutesBefore) * 60)
             guard triggerDate > Date() else { return }
             let content = UNMutableNotificationContent()
             content.title = "签署提醒"
-            content.body = "\(remindHoursBefore) 小时后出发（桌上 \(minutes) 分钟 + 车程 \(buffer) 分钟）。带齐耗材工具。"
+            content.body = "\(remindMinutesBefore >= 60 ? "\(remindMinutesBefore / 60) 小时" : "\(remindMinutesBefore) 分钟")后出发（桌上 \(minutes) 分钟 + 车程 \(buffer) 分钟）。带齐耗材工具。"
             content.sound = .default
             let comps = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: triggerDate)
             let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
