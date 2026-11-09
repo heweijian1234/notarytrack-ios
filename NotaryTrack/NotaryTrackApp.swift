@@ -880,7 +880,7 @@ enum NTExporter {
         l.append("——逐单明细——")
         for s in done.sorted(by: { $0.date < $1.date }) {
             let cn = data.clients.first { $0.id == s.clientId }?.company ?? "?"
-            l.append(\(df.string(from: s.date)) \(cn) $" + String(format: "%.0f", s.fee) + " " + String(format: "%.0f", s.mileage) + "mi \(s.paid ? "已收" : "未收")"")
+            l.append(df.string(from: s.date) + " " + cn + " $" + String(format: "%.0f", s.fee) + " " + String(format: "%.0f", s.mileage) + "mi " + (s.paid ? "已收" : "未收"))
         }
         return l.joined(separator: "\n")
     }
