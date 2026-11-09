@@ -36,7 +36,7 @@ jobs:
       - name: Install XcodeGen (direct binary, skip brew)
         run: |
           set -x
-          curl -fsSL -o xcodegen.zip https://github.com/yonaskolb/XcodeGen/releases/latest/download/xcodegen.zip
+          curl -fsSL -o xcodegen.zip https://github.com/yonaskolb/XcodeGen/releases/download/2.42.0/xcodegen.zip || curl -fsSL -o xcodegen.zip https://github.com/yonaskolb/XcodeGen/releases/latest/download/xcodegen.zip
           unzip -q xcodegen.zip
           ./xcodegen/bin/xcodegen --version
 
