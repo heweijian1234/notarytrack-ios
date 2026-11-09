@@ -26,6 +26,9 @@ struct RootView: View {
             ClientListView(data: $data)
                 .tabItem { Label("客户", systemImage: "person.2") }
                 .tag(2)
+            FeedbackView()
+                .tabItem { Label("我的", systemImage: "person.crop.circle") }
+                .tag(3)
         }
         .onAppear { data = Store.load() }
     }
@@ -666,6 +669,54 @@ struct ClientDetailView: View {
         }
         .sheet(isPresented: $showEdit, onDismiss: { data = Store.load() }) {
             ClientEditor(data: $data, existing: current)
+        }
+    }
+}
+
+
+// MARK: - Tab4 我的/反馈（健哥令③）
+
+struct FeedbackView: View {
+    @State private var feedbackText = ""
+    @State private var sent = false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("反馈意见") {
+                    TextEditor(text: $feedbackText)
+                        .frame(minHeight: 120)
+                        .overlay(
+                            Group {
+                                if feedbackText.isEmpty {
+                                    Text("用着哪里不顺？缺什么功能？直接写。")
+                                        .foregroundColor(.secondary)
+                                        .font(.footnote)
+                                        .padding(.top, 8)
+                                        .allowsHitTesting(false)
+                                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                                }
+                            }
+                        )
+                }
+                Section {
+                    Button {
+                        let subject = "公证签署台账-用户反馈"
+                        let body = feedbackText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+                        if let url = URL(string: "mailto:zeronelabs.dev@gmail.com?subject=\(subject)&body=\(body)") {
+                            UIApplication.shared.open(url)
+                            sent = true
+                        }
+                    } label: {
+                        Label(sent ? "已打开邮件——发送即完成反馈" : "发送反馈（走你的邮件）", systemImage: "paperplane.fill")
+                    }
+                    .disabled(feedbackText.isEmpty)
+                } footer: {
+                    Text("反馈通过邮件直达开发者，不留任何数据在 App 里。")
+                }
+            }
+            .navigationTitle("我的")
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 }

@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 // MARK: - 签署单编辑器（新建/编辑）——费用/里程/行为计数/状态
 
@@ -20,7 +21,24 @@ struct SigningEditor: View {
     @State private var borrowDocs = 1
     @State private var trustDocs = 0
     @State private var otherDocs = 0
+    @State private var supplyCost = 2.50      // 健哥令②：耗材成本自填
+    @State private var remindMe = true        // 健哥令②：提醒开关
+    @State private var remindHoursBefore = 2  // 提前小时数
+    @State private var notaryFeeHint = "打包价通常 $0"
     @State private var note = ""
+
+    // 健哥令④：类型联动——选类型给建议默认值
+    private func applyTypeDefaults(_ t: ServiceType) {
+        switch t {
+        case .loan: minutes = 60
+        case .general: minutes = 15
+        case .apostille: minutes = 30
+        case .hospital: minutes = 30
+        case .estate: minutes = 45
+        case .other: minutes = 30
+        }
+        notaryFeeHint = (t == .general || t == .hospital || t == .estate) ? "每签 $10-25（按州价）" : "打包价通常 $0"
+    }
 
     var body: some View {
         NavigationStack {
@@ -76,7 +94,14 @@ struct SigningEditor: View {
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                     }
-                    Text("公证费部分免自雇税（IRS §1402）· 里程按 IRS 标准可抵税（$\(mileage * 0.67, specifier: "%.0f")）")
+                    // 健哥令②：耗材成本自填
+                    HStack {
+                        Text("耗材成本 $（打印/纸/墨）")
+                        TextField("2.5", value: $supplyCost, format: .number)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    Text("公证费部分免自雇税（IRS §1402）· 里程抵税 $\(mileage * 0.67, specifier: \"%.0f\") · 净利已含耗材")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -84,6 +109,23 @@ struct SigningEditor: View {
                     Stepper("借款合同 \(borrowDocs) 份", value: $borrowDocs, in: 0...20)
                     Stepper("信托文件 \(trustDocs) 份", value: $trustDocs, in: 0...20)
                     Stepper("其他 \(otherDocs) 份", value: $otherDocs, in: 0...20)
+                }
+                // 健哥令②：闹钟提醒（开关+提前量）
+                Section("提醒（闹钟）") {
+                    Toggle("提前提醒我出发", isOn: $remindMe)
+                    if remindMe {
+                        Picker("提前", selection: $remindHoursBefore) {
+                            Text("提前 1 小时").tag(1)
+                            Text("提前 2 小时").tag(2)
+                            Text("提前 3 小时").tag(3)
+                            Text("提前 4 小时").tag(4)
+                            Text("提前 6 小时").tag(6)
+                            Text("提前 10 小时").tag(10)
+                        }
+                        Text("预约前 \(remindHoursBefore) 小时通知你出发（桌上 \(minutes) 分钟 + 车程 \(buffer) 分钟）。")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
                 Section("备注") {
                     TextField("订单号/特殊要求…", text: $note, axis: .vertical)
@@ -108,6 +150,12 @@ struct SigningEditor: View {
             }
         }
     }
+                    .onChange(of: serviceType) { t in
+                        applyTypeDefaults(t)
+                    }
+                    Text("该类型建议：桌上约 \(minutes) 分钟 · 公证费 \(notaryFeeHint)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
 
     private func save() {
         guard let cid = clientId else { return }
@@ -116,8 +164,29 @@ struct SigningEditor: View {
                                      mileage: mileage, minutes: minutes, driveBufferMinutes: buffer,
                                      serviceType: serviceType, borrowDocs: borrowDocs,
                                      trustDocs: trustDocs, otherDocs: otherDocs, note: note))
+        data.settings.supplyCostPerSigning = supplyCost   // 记住耗材单价
         Store.save(data)
+        scheduleLocalReminder()
         dismiss()
+    }
+
+    /// 本地通知：预约前 remindHoursBefore 小时
+    private func scheduleLocalReminder() {
+        guard remindMe else { return }
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            guard granted else { return }
+            let triggerDate = date.addingTimeInterval(-Double(remindHoursBefore) * 3600)
+            guard triggerDate > Date() else { return }
+            let content = UNMutableNotificationContent()
+            content.title = "签署提醒"
+            content.body = "\(remindHoursBefore) 小时后出发（桌上 \(minutes) 分钟 + 车程 \(buffer) 分钟）。带齐耗材工具。"
+            content.sound = .default
+            let comps = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: triggerDate)
+            let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
+            let req = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: trigger)
+            center.add(req)
+        }
     }
 }
 
