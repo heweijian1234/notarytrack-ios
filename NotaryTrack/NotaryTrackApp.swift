@@ -301,6 +301,35 @@ struct SigningRowHeader: View {
     }
 }
 
+// MARK: - 签署单列表整行（397 类型检查超时拆分子视图）
+
+struct SigningListRow: View {
+    let s: Signing
+    @Binding var data: Store.Data
+    let sortedDesc: [Signing]
+
+    private var clientName: String {
+        data.clients.first { $0.id == s.clientId }?.company ?? "未知"
+    }
+
+    var body: some View {
+        NavigationLink(destination: SigningDetailView(signing: s, data: $data)) {
+            VStack(alignment: .leading, spacing: 2) {
+                SigningRowHeader(s: s, clientName: clientName)
+                SigningRowMetrics(s: s, verdict: verdictColor(s))
+            }
+        }
+        // 健哥令④：左滑删除
+        .onDelete { offsets in
+            for i in offsets {
+                let target = sortedDesc[i]
+                data.signings.removeAll { $0.id == target.id }
+            }
+            Store.save(data)
+        }
+    }
+}
+
 // MARK: - Tab2 签署单列表 + 月度小结（N1/N2/N3）
 
 struct SigningListView: View {
@@ -393,21 +422,7 @@ struct SigningListView: View {
                         }
                         Section("全部签署单") {
                             ForEach(sortedDesc) { s in
-                                NavigationLink(destination: SigningDetailView(signing: s, data: $data)) {
-                                    let cname = data.clients.first { $0.id == s.clientId }?.company ?? "未知"
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        SigningRowHeader(s: s, clientName: cname)
-                                        SigningRowMetrics(s: s, verdict: verdictColor(s))
-                                    }
-                                }
-                                // 健哥令④：左滑删除
-                                .onDelete { offsets in
-                                    for i in offsets {
-                                        let target = sortedDesc[i]
-                                        data.signings.removeAll { $0.id == target.id }
-                                    }
-                                    Store.save(data)
-                                }
+                                SigningListRow(s: s, data: $data, sortedDesc: sortedDesc)
                             }
                         }
                     }
