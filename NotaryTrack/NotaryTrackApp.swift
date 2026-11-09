@@ -840,11 +840,11 @@ enum NTExporter {
         l.append("时间：\(df.string(from: s.date))")
         if !s.address.isEmpty { l.append("地点：\(s.address)") }
         l.append("类型：\(s.serviceType.rawValue)")
-        l.append("总费用：$\(s.fee, specifier: "%.0f")（公证费免税 $\(s.notaryFeePortion, specifier: "%.0f") + 服务费应税 $\(s.taxablePortion, specifier: "%.0f")）")
-        if s.tripFee > 0 { l.append("跑趟费：$\(s.tripFee, specifier: "%.0f")") }
-        l.append("里程：\(s.mileage, specifier: "%.1f") mi（抵税 $\(s.mileage * settings.mileageRate, specifier: "%.0f")）")
-        l.append("耗材：$\(settings.supplyCostPerSigning, specifier: "%.2f")")
-        l.append("净利：$\(s.netProfit, specifier: "%.2f") / 时薪 $\(s.hourlyNet, specifier: "%.0f")")
+        l.append(""总费用：$" + String(format: "%.0f", s.fee) + "（公证费免税 $" + String(format: "%.0f", s.notaryFeePortion) + " + 服务费应税 $" + String(format: "%.0f", s.taxablePortion) + "）"")
+        if s.tripFee > 0 { l.append(""跑趟费：$" + String(format: "%.0f", s.tripFee) + """) }
+        l.append(""里程：" + String(format: "%.1f", s.mileage) + " mi（抵税 $" + String(format: "%.0f", s.mileage * settings.mileageRate) + "）"")
+        l.append(""耗材：$" + String(format: "%.2f", settings.supplyCostPerSigning) + """)
+        l.append(""净利：$" + String(format: "%.2f", s.netProfit) + " / 时薪 $" + String(format: "%.0f", s.hourlyNet) + """)
         l.append("状态：\(s.status == .done ? "完成" : s.status == .noshow ? "没成功" : "已约") · \(s.paid ? "已收" : "未收")")
         l.append("公证行为：借款 \(s.borrowDocs) / 信托 \(s.trustDocs) / 其他 \(s.otherDocs)")
         if !s.note.isEmpty { l.append("备注：\(s.note)") }
@@ -864,23 +864,23 @@ enum NTExporter {
         let miles = done.reduce(0) { $0 + $1.mileage }
         let net = done.reduce(0) { $0 + $1.netProfit }
         l.append("单数：\(done.count)")
-        l.append("总收入：$\(income, specifier: "%.0f")")
-        l.append("  其中公证费（SE 免税）：$\(notary, specifier: "%.0f")")
-        l.append("  其中服务费（应税）：$\(income - notary, specifier: "%.0f")")
-        l.append("总里程：\(miles, specifier: "%.0f") mi（抵税 $\(miles * data.settings.mileageRate, specifier: "%.0f")）")
-        l.append("总净利：$\(net, specifier: "%.0f")")
+        l.append(""总收入：$" + String(format: "%.0f", income) + """)
+        l.append(""  其中公证费（SE 免税）：$" + String(format: "%.0f", notary) + """)
+        l.append(""  其中服务费（应税）：$" + String(format: "%.0f", income - notary) + """)
+        l.append(""总里程：" + String(format: "%.0f", miles) + " mi（抵税 $" + String(format: "%.0f", miles * data.settings.mileageRate) + "）"")
+        l.append(""总净利：$" + String(format: "%.0f", net) + """)
         let unpaid = data.signings.filter { $0.status == .done && !$0.paid }
         if !unpaid.isEmpty {
-            l.append("⚠️ 未收款 \(unpaid.count) 单，合计 $\(unpaid.reduce(0) { $0 + $1.fee }, specifier: "%.0f")：")
+            l.append(""⚠️ 未收款 \(unpaid.count) 单，合计 $" + String(format: "%.0f", unpaid.reduce(0) { $0 + $1.fee }) + "："")
             for u in unpaid {
-                l.append("  - \(data.clients.first { $0.id == u.clientId }?.company ?? "?") $\(u.fee, specifier: "%.0f")（\(u.unpaidDays) 天）")
+                l.append(""  - \(data.clients.first { $0.id == u.clientId }?.company ?? "?") $" + String(format: "%.0f", u.fee) + "（\(u.unpaidDays) 天）"")
             }
         }
         l.append("")
         l.append("——逐单明细——")
         for s in done.sorted(by: { $0.date < $1.date }) {
             let cn = data.clients.first { $0.id == s.clientId }?.company ?? "?"
-            l.append("\(df.string(from: s.date)) \(cn) $\(s.fee, specifier: "%.0f") \(s.mileage, specifier: "%.0f")mi \(s.paid ? "已收" : "未收")")
+            l.append(""\(df.string(from: s.date)) \(cn) $" + String(format: "%.0f", s.fee) + " " + String(format: "%.0f", s.mileage) + "mi \(s.paid ? "已收" : "未收")"")
         }
         return l.joined(separator: "\n")
     }
