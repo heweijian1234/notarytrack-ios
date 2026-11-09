@@ -300,10 +300,12 @@ struct SigningListView: View {
                         // A1 拖款账龄警示条（最愤怒痛点置顶）
                         if monthSummary.overdueCount > 0 {
                             Section {
-                                Label("\(monthSummary.overdueCount) 单逾期未收，合计 $\(monthSummary.overdueAmount, specifier: "%.0f")（超30天）",
-                                      systemImage: "clock.badge.exclamationmark.fill")
-                                    .font(.footnote)
-                                    .foregroundColor(.red)
+                                NavigationLink(destination: OverdueListView(overdue: overdueSignings, data: $data)) {
+                                    Label("\(monthSummary.overdueCount) 单逾期未收，合计 $\(monthSummary.overdueAmount, specifier: "%.0f")（超30天）",
+                                          systemImage: "clock.badge.exclamationmark.fill")
+                                        .font(.footnote)
+                                        .foregroundColor(.red)
+                                }
                             }
                         }
                         Section("本月小结") {
@@ -478,6 +480,25 @@ struct SigningDetailView: View {
                 LabeledRow("信托文件", "\(current.trustDocs) 份")
                 LabeledRow("其他", "\(current.otherDocs) 份")
             }
+            // 健哥令③：后续处理——未收→标记已收（清账龄）；已收→改回未收
+            if current.status == .done {
+                Section("收款处理") {
+                    if current.paid {
+                        Button(role: .destructive) {
+                            markUnpaid()
+                        } label: {
+                            Label("改回未收款", systemImage: "arrow.uturn.backward")
+                        }
+                    } else {
+                        Button {
+                            markPaid()
+                        } label: {
+                            Label("标记已收款（清逾期）", systemImage: "checkmark.seal.fill")
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                }
+            }
             if !current.note.isEmpty {
                 Section("备注") { Text(current.note) }
             }
@@ -487,6 +508,22 @@ struct SigningDetailView: View {
 
     var statusIndex: Int {
         switch current.status { case .scheduled: return 0; case .done: return 1; case .noshow: return 2 }
+    }
+
+    // 健哥令③：标记已收（记录 paidDate→A2 付款速度/A6 评级数据源）
+    private func markPaid() {
+        if let i = data.signings.firstIndex(where: { $0.id == current.id }) {
+            data.signings[i].paid = true
+            data.signings[i].paidDate = Date()
+            Store.save(data)
+        }
+    }
+    private func markUnpaid() {
+        if let i = data.signings.firstIndex(where: { $0.id == current.id }) {
+            data.signings[i].paid = false
+            data.signings[i].paidDate = nil
+            Store.save(data)
+        }
     }
 
     // A5 时薪判决（对照 settings.hourlyFloor）
@@ -718,5 +755,66 @@ struct FeedbackView: View {
             .navigationTitle("我的")
             .navigationBarTitleDisplayMode(.inline)
         }
+    }
+}
+
+
+// MARK: - 逾期单列表（健哥令②③：点警示条进来，逐单处理收款）
+
+struct OverdueListView: View {
+    let overdue: [Signing]
+    @Binding var data: Store.Data
+
+    var total: Double { overdue.reduce(0) { $0 + $1.fee } }
+
+    var body: some View {
+        List {
+            Section {
+                LabeledRow("逾期单数", "\(overdue.count) 单")
+                LabeledRow("逾期合计", "$\(total, specifier: \"%.0f\")")
+            }
+            Section("逐单处理") {
+                ForEach(overdue.sorted { $0.unpaidDays > $1.unpaidDays }) { s in
+                    OverdueRow(signing: s, data: $data)
+                }
+            }
+        }
+        .navigationTitle("逾期未收")
+    }
+}
+
+struct OverdueRow: View {
+    let signing: Signing
+    @Binding var data: Store.Data
+
+    var client: Client? { data.clients.first { $0.id == signing.clientId } }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(client?.company ?? "未知客户").font(.headline)
+                Spacer()
+                Text("$\(signing.fee, specifier: \"%.0f\")").font(.headline)
+            }
+            HStack {
+                // 账龄色标
+                Text("逾期 \(signing.unpaidDays) 天")
+                    .font(.caption)
+                    .foregroundColor(signing.agingLevel == 2 ? .red : .orange)
+                Spacer()
+                Button {
+                    if let i = data.signings.firstIndex(where: { $0.id == signing.id }) {
+                        data.signings[i].paid = true
+                        data.signings[i].paidDate = Date()
+                        Store.save(data)
+                    }
+                } label: {
+                    Label("已收款", systemImage: "checkmark.seal.fill")
+                        .font(.caption)
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(.vertical, 2)
     }
 }
