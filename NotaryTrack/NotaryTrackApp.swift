@@ -276,6 +276,31 @@ struct SigningRowMetrics: View {
     }
 }
 
+// MARK: - 签署单头部行（374 类型检查超时拆分子视图）
+
+struct SigningRowHeader: View {
+    let s: Signing
+    let clientName: String
+
+    var body: some View {
+        HStack {
+            Text(clientName)
+                .font(.headline)
+            Text(s.serviceType.emoji).font(.caption)
+            if s.status == .noshow {
+                Text("没来").font(.caption2).foregroundColor(.red)
+            }
+            if s.agingLevel > 0 {
+                Text("逾期\(s.unpaidDays)天")
+                    .font(.caption2)
+                    .foregroundColor(s.agingLevel == 2 ? .red : .orange)
+            }
+            Spacer()
+            Text(s.date, style: .date).font(.caption).foregroundColor(.secondary)
+        }
+    }
+}
+
 // MARK: - Tab2 签署单列表 + 月度小结（N1/N2/N3）
 
 struct SigningListView: View {
@@ -370,22 +395,7 @@ struct SigningListView: View {
                             ForEach(sortedDesc) { s in
                                 NavigationLink(destination: SigningDetailView(signing: s, data: $data)) {
                                     VStack(alignment: .leading, spacing: 2) {
-                                        HStack {
-                                            Text(data.clients.first { $0.id == s.clientId }?.company ?? "未知")
-                                                .font(.headline)
-                                            Text(s.serviceType.emoji).font(.caption)
-                                            if s.status == .noshow {
-                                                Text("没来").font(.caption2).foregroundColor(.red)
-                                            }
-                                            // A1 账龄色标
-                                            if s.agingLevel > 0 {
-                                                Text("逾期\(s.unpaidDays)天")
-                                                    .font(.caption2)
-                                                    .foregroundColor(s.agingLevel == 2 ? .red : .orange)
-                                            }
-                                            Spacer()
-                                            Text(s.date, style: .date).font(.caption).foregroundColor(.secondary)
-                                        }
+                                        SigningRowHeader(s: s, clientName: data.clients.first { $0.id == s.clientId }?.company ?? "未知")
                                         SigningRowMetrics(s: s, verdict: verdictColor(s))
                                     }
                                 }
