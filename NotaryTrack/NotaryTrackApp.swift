@@ -951,7 +951,7 @@ struct MonthCalendarView: View {
             }
             ForEach(Array(calendarRows.enumerated()), id: \.offset) { _, row in
                 HStack(spacing: 0) {
-                    ForEach(0..<7, id: \.self) { i in
+                    ForEach(row.indices, id: \.self) { i in
                         if i < row.count, let date = row[i] {
                             let df = DateFormatter()
                             df.dateFormat = "yyyy-MM-dd"
