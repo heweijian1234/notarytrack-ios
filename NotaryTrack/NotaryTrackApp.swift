@@ -499,7 +499,6 @@ struct SigningDetailView: View {
         if current.hourlyNet >= floor * 0.8 { return "⚠️ 勉强" }
         return "🔴 低于地板"
     }
-    }
 }
 
 struct LabeledRow: View {
