@@ -951,8 +951,8 @@ struct MonthCalendarView: View {
             }
             ForEach(Array(calendarRows.enumerated()), id: \.offset) { _, row in
                 HStack(spacing: 0) {
-                    ForEach(row.indices, id: \.self) { i in
-                        if i < row.count, let date = row[i] {
+                    ForEach(Array(row.enumerated()), id: \.offset) { ci, cellOpt in
+                        if let date = cellOpt {
                             let df = DateFormatter()
                             df.dateFormat = "yyyy-MM-dd"
                             let isBooked = bookedDays.contains(df.string(from: date))
