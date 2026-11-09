@@ -255,6 +255,27 @@ struct SigningRow: View {
     }
 }
 
+// MARK: - 签署单指标行（353 类型检查超时拆分子视图）
+
+struct SigningRowMetrics: View {
+    let s: Signing
+    let verdict: Color
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text("$" + String(format: "%.0f", s.fee))
+            Text("· 净利 $" + String(format: "%.0f", s.netProfit))
+            Text("· " + String(format: "%.0f", s.mileage) + " mi")
+            Text("· " + (s.paid ? "已收" : "未收"))
+            Circle()
+                .fill(verdict)
+                .frame(width: 8, height: 8)
+        }
+        .font(.caption)
+        .foregroundColor(.secondary)
+    }
+}
+
 // MARK: - Tab2 签署单列表 + 月度小结（N1/N2/N3）
 
 struct SigningListView: View {
@@ -365,18 +386,7 @@ struct SigningListView: View {
                                             Spacer()
                                             Text(s.date, style: .date).font(.caption).foregroundColor(.secondary)
                                         }
-                                        HStack(spacing: 8) {
-                                            Text("$\(s.fee, specifier: "%.0f")")
-                                            Text("· 净利 $\(s.netProfit, specifier: "%.0f")")
-                                            Text("· \(s.mileage, specifier: "%.0f") mi")
-                                            Text("· \(s.paid ? "已收" : "未收")")
-                                            // A5 时薪判决色点
-                                            Circle()
-                                                .fill(verdictColor(s))
-                                                .frame(width: 8, height: 8)
-                                        }
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
+                                        SigningRowMetrics(s: s, verdict: verdictColor(s))
                                     }
                                 }
                                 // 健哥令④：左滑删除
