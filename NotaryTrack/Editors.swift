@@ -107,7 +107,7 @@ struct SigningEditor: View {
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                     }
-                    Text("公证费部分免自雇税（IRS §1402）· 里程抵税 $\(mileage * 0.67, specifier: '%.0f') · 净利已含耗材")
+                    Text("公证费部分免自雇税（IRS §1402）· 里程抵税 $\(String(format: "%.0f", mileage * 0.67)) · 净利已含耗材")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
