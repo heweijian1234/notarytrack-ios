@@ -63,6 +63,12 @@ struct SigningEditor: View {
                             Text("\(t.emoji) \(t.rawValue)").tag(t)
                         }
                     }
+                    .onChange(of: serviceType) { t in
+                        applyTypeDefaults(t)
+                    }
+                    Text("该类型建议：桌上约 \(minutes) 分钟 · 公证费 \(notaryFeeHint)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                     DatePicker("时间", selection: $date)
                     TextField("签署地点（房产地址）", text: $address)
                     Stepper("桌上 \(minutes) 分钟", value: $minutes, in: 15...240, step: 15)
@@ -101,7 +107,7 @@ struct SigningEditor: View {
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                     }
-                    Text("公证费部分免自雇税（IRS §1402）· 里程抵税 $\(mileage * 0.67, specifier: \"%.0f\") · 净利已含耗材")
+                    Text("公证费部分免自雇税（IRS §1402）· 里程抵税 $\(mileage * 0.67, specifier: '%.0f') · 净利已含耗材")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -150,12 +156,7 @@ struct SigningEditor: View {
             }
         }
     }
-                    .onChange(of: serviceType) { t in
-                        applyTypeDefaults(t)
-                    }
-                    Text("该类型建议：桌上约 \(minutes) 分钟 · 公证费 \(notaryFeeHint)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+
 
     private func save() {
         guard let cid = clientId else { return }
