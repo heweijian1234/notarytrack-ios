@@ -394,8 +394,9 @@ struct SigningListView: View {
                         Section("全部签署单") {
                             ForEach(sortedDesc) { s in
                                 NavigationLink(destination: SigningDetailView(signing: s, data: $data)) {
+                                    let cname = data.clients.first { $0.id == s.clientId }?.company ?? "未知"
                                     VStack(alignment: .leading, spacing: 2) {
-                                        SigningRowHeader(s: s, clientName: data.clients.first { $0.id == s.clientId }?.company ?? "未知")
+                                        SigningRowHeader(s: s, clientName: cname)
                                         SigningRowMetrics(s: s, verdict: verdictColor(s))
                                     }
                                 }
