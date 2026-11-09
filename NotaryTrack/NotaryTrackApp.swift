@@ -871,9 +871,9 @@ enum NTExporter {
         l.append("总净利：$" + String(format: "%.0f", net) )
         let unpaid = data.signings.filter { $0.status == .done && !$0.paid }
         if !unpaid.isEmpty {
-            l.append(⚠️ 未收款 \(unpaid.count) 单，合计 $" + String(format: "%.0f", unpaid.reduce(0) { $0 + $1.fee }) + "："")
+            l.append("⚠️ 未收款 \(unpaid.count) 单，合计 $" + String(format: "%.0f", unpaid.reduce(0) { $0 + $1.fee }) + "：")
             for u in unpaid {
-                l.append(  - \(data.clients.first { $0.id == u.clientId }?.company ?? "?") $" + String(format: "%.0f", u.fee) + "（\(u.unpaidDays) 天）"")
+                l.append("  - " + (data.clients.first { $0.id == u.clientId }?.company ?? "?") + " $" + String(format: "%.0f", u.fee) + "（\(u.unpaidDays) 天）")
             }
         }
         l.append()
