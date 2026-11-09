@@ -54,6 +54,11 @@ struct TodayView: View {
         let today = Calendar.current.startOfDay(for: Date())
         var result: [(Client, Int, Int)] = []
         for c in data.clients {
+            // 健哥令②：拖账超90天=坏账关系，不回访（优先催款而非接新单）
+            let overdue90 = data.signings.contains { s in
+                s.clientId == c.id && s.agingLevel == 2 && !s.paid
+            }
+            if overdue90 { continue }
             let lastDone = data.signings
                 .filter { $0.clientId == c.id && ($0.status == .done || $0.status == .noshow) }
                 .compactMap { Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: $0.date), to: today).day }
@@ -362,6 +367,7 @@ struct SigningListView: View {
                                         }
                                         HStack(spacing: 8) {
                                             Text("$\(s.fee, specifier: "%.0f")")
+                                            Text("· 净利 $\(s.netProfit, specifier: "%.0f")")
                                             Text("· \(s.mileage, specifier: "%.0f") mi")
                                             Text("· \(s.paid ? "已收" : "未收")")
                                             // A5 时薪判决色点
@@ -372,6 +378,14 @@ struct SigningListView: View {
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                     }
+                                }
+                                // 健哥令④：左滑删除
+                                .onDelete { offsets in
+                                    for i in offsets {
+                                        let target = sortedDesc[i]
+                                        data.signings.removeAll { $0.id == target.id }
+                                    }
+                                    Store.save(data)
                                 }
                             }
                         }
@@ -481,7 +495,9 @@ struct SigningDetailView: View {
                     Text(verdictText)
                         .foregroundColor(verdictColor)
                 }
-            }
+                Text(verdictReason)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             Section("公证行为计数") {
                 LabeledRow("借款合同", "\(current.borrowDocs) 份")
                 LabeledRow("信托文件", "\(current.trustDocs) 份")
@@ -545,6 +561,27 @@ struct SigningDetailView: View {
         if current.hourlyNet >= floor { return "✅ 值得接" }
         if current.hourlyNet >= floor * 0.8 { return "⚠️ 勉强" }
         return "🔴 低于地板"
+    }
+
+    /// 健哥令③：判决理由（为什么值/不值）
+    private var verdictReason: String {
+        let floor = data.settings.hourlyFloor
+        let net = current.netProfit
+        let hours = Double(current.doorToDoorMinutes) / 60.0
+        var reasons: [String] = []
+        reasons.append("费用 $" + String(format: "%.0f", current.fee))
+        reasons.append("里程 " + String(format: "%.0f", current.mileage) + " mi（-$" + String(format: "%.0f", current.mileage * data.settings.mileageRate) + "）")
+        reasons.append("耗材 -$" + String(format: "%.0f", data.settings.supplyCostPerSigning))
+        reasons.append("净利 $" + String(format: "%.0f", net))
+        reasons.append("门到门 " + String(current.doorToDoorMinutes) + " 分钟 → 时薪 $" + String(format: "%.0f", current.hourlyNet))
+        let base = "对照地板 $" + String(format: "%.0f", floor) + "/小时："
+        if current.hourlyNet >= floor {
+            return base + "时薪达标，" + reasons.joined(separator: " · ")
+        }
+        if current.hourlyNet >= floor * 0.8 {
+            return base + "差 " + String(format: "%.0f", floor - current.hourlyNet) + "/小时到地板。" + reasons.joined(separator: " · ")
+        }
+        return base + "低于地板 " + String(format: "%.0f", floor - current.hourlyNet) + "/小时，建议下次报价 ≥ $" + String(format: "%.0f", floor * hours + current.mileage * data.settings.mileageRate + data.settings.supplyCostPerSigning) + "。"
     }
 }
 
