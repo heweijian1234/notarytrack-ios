@@ -279,6 +279,11 @@ struct SigningListView: View {
         )
     }
 
+    /// 健哥令③：全部逾期单（账龄>0，按逾期天数降序）
+    var overdueSignings: [Signing] {
+        data.signings.filter { $0.agingLevel > 0 }.sorted { $0.unpaidDays > $1.unpaidDays }
+    }
+
     var body: some View {
         NavigationStack {
             Group {
