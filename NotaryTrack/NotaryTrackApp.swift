@@ -875,7 +875,6 @@ enum NTExporter {
                 l.append("  - " + (data.clients.first { $0.id == u.clientId }?.company ?? "?") + " $" + String(format: "%.0f", u.fee) + "（\(u.unpaidDays) 天）")
             }
         }
-        l.append()
         l.append("——逐单明细——")
         for s in done.sorted(by: { $0.date < $1.date }) {
             let cn = data.clients.first { $0.id == s.clientId }?.company ?? "?"
@@ -924,6 +923,17 @@ struct MonthCalendarView: View {
         return df.string(from: selectedMonth)
     }
 
+    private var calendarRows: [[Date?]] {
+        var rows: [[Date?]] = []
+        var cur: [Date?] = []
+        for cell in monthDays {
+            cur.append(cell)
+            if cur.count == 7 { rows.append(cur); cur = [] }
+        }
+        if !cur.isEmpty { rows.append(cur) }
+        return rows
+    }
+
     var body: some View {
         VStack(spacing: 6) {
             HStack {
@@ -939,14 +949,7 @@ struct MonthCalendarView: View {
                     Text(w).font(.caption2).foregroundColor(.secondary).frame(maxWidth: .infinity)
                 }
             }
-            var rows: [[Date?]] = []
-            var cur: [Date?] = []
-            for cell in monthDays {
-                cur.append(cell)
-                if cur.count == 7 { rows.append(cur); cur = [] }
-            }
-            if !cur.isEmpty { rows.append(cur) }
-            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+            ForEach(Array(calendarRows.enumerated()), id: \.offset) { _, row in
                 HStack(spacing: 0) {
                     ForEach(0..<7, id: \.self) { i in
                         if i < row.count, let date = row[i] {
