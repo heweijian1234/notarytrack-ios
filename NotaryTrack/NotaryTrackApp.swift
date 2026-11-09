@@ -255,6 +255,8 @@ struct SigningRow: View {
 struct SigningListView: View {
     @Binding var data: Store.Data
     @State private var showAdd = false
+    @State private var exportText: String?
+    @State private var showExport = false
 
     /// 本月小结 v2（A1账龄/A3净利/A4免税拆分/A7跑趟费/A8类型 全并入）
     var monthSummary: (count: Int, income: Double, notaryPortion: Double, taxablePortion: Double,
@@ -384,9 +386,6 @@ struct SigningListView: View {
             }
             .sheet(isPresented: $showAdd, onDismiss: { data = Store.load() }) {
                 SigningEditor(data: $data, preselectedClientId: nil)
-            }
-            .sheet(isPresented: $showExport, onDismiss: { exportText = nil }) {
-                ShareSheet(items: [exportText ?? ""])
             }
         }
     }
