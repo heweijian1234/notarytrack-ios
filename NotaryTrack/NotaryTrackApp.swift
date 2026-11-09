@@ -498,6 +498,7 @@ struct SigningDetailView: View {
                 Text(verdictReason)
                     .font(.caption)
                     .foregroundColor(.secondary)
+            }
             Section("公证行为计数") {
                 LabeledRow("借款合同", "\(current.borrowDocs) 份")
                 LabeledRow("信托文件", "\(current.trustDocs) 份")
