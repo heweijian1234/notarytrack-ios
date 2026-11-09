@@ -245,8 +245,8 @@ struct SigningListView: View {
                         Section("本月小结") {
                             HStack {
                                 StatCell("单数", "\(monthSummary.count)")
-                                StatCell("收入", "$\(monthSummary.income, specifier: "%.0f")")
-                                StatCell("里程", "\(monthSummary.miles, specifier: "%.0f") mi")
+                                StatCell("收入", "$" + String(format: "%.0f", monthSummary.income))
+                                StatCell("里程", String(format: "%.0f", monthSummary.miles) + " mi")
                                 StatCell("公证行为", "\(monthSummary.acts)")
                             }
                             if monthSummary.unpaid > 0 {
@@ -337,8 +337,8 @@ struct SigningDetailView: View {
             Section("本单") {
                 LabeledRow("时间", current.date.formatted(date: .long, time: .shortened))
                 if !current.address.isEmpty { LabeledRow("地点", current.address) }
-                LabeledRow("费用", "$\(current.fee, specifier: "%.0f")")
-                LabeledRow("里程", "\(current.mileage, specifier: "%.1f") mi")
+                LabeledRow("费用", "$" + String(format: "%.0f", current.fee))
+                LabeledRow("里程", String(format: "%.1f", current.mileage) + " mi")
                 LabeledRow("状态", ["已约", "完成", "没来"][statusIndex])
                 LabeledRow("收款", current.paid ? "已收" : "未收")
             }
