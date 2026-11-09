@@ -307,6 +307,7 @@ struct SigningListRow: View {
     let s: Signing
     @Binding var data: Store.Data
     let sortedDesc: [Signing]
+    let verdictColor: (Signing) -> Color
 
     private var clientName: String {
         data.clients.first { $0.id == s.clientId }?.company ?? "未知"
@@ -318,14 +319,6 @@ struct SigningListRow: View {
                 SigningRowHeader(s: s, clientName: clientName)
                 SigningRowMetrics(s: s, verdict: verdictColor(s))
             }
-        }
-        // 健哥令④：左滑删除
-        .onDelete { offsets in
-            for i in offsets {
-                let target = sortedDesc[i]
-                data.signings.removeAll { $0.id == target.id }
-            }
-            Store.save(data)
         }
     }
 }
@@ -422,7 +415,15 @@ struct SigningListView: View {
                         }
                         Section("全部签署单") {
                             ForEach(sortedDesc) { s in
-                                SigningListRow(s: s, data: $data, sortedDesc: sortedDesc)
+                                SigningListRow(s: s, data: $data, sortedDesc: sortedDesc, verdictColor: verdictColor)
+                            }
+                            // 健哥令④：左滑删除（onDelete 必须挂在 ForEach 直接内容上）
+                            .onDelete { offsets in
+                                for i in offsets {
+                                    let target = sortedDesc[i]
+                                    data.signings.removeAll { $0.id == target.id }
+                                }
+                                Store.save(data)
                             }
                         }
                     }
