@@ -771,7 +771,7 @@ struct OverdueListView: View {
         List {
             Section {
                 LabeledRow("逾期单数", "\(overdue.count) 单")
-                LabeledRow("逾期合计", "$\(total, specifier: "%.0f")")
+                LabeledRow("逾期合计", "$" + String(format: "%.0f", total))
             }
             Section("逐单处理") {
                 ForEach(overdue.sorted { $0.unpaidDays > $1.unpaidDays }) { s in
