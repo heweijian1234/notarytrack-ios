@@ -46,6 +46,23 @@ struct TodayView: View {
         return nil
     }
 
+    // A9 该回访了：企业客户 30 天/个人客户 90 天无新单
+    var dueFollowUps: [(Client, Int, Int)] {
+        let today = Calendar.current.startOfDay(for: Date())
+        var result: [(Client, Int, Int)] = []
+        for c in data.clients {
+            let lastDone = data.signings
+                .filter { $0.clientId == c.id && ($0.status == .done || $0.status == .noshow) }
+                .compactMap { Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: $0.date), to: today).day }
+                .min() ?? Int.max
+            let threshold = c.isBusiness ? 30 : 90
+            if lastDone >= threshold {
+                result.append((c, lastDone, threshold))
+            }
+        }
+        return result.sorted { $0.1 > $1.1 }
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -70,6 +87,31 @@ struct TodayView: View {
                             Section {
                                 Label(warn, systemImage: "exclamationmark.triangle.fill")
                                     .foregroundColor(.red)
+                            }
+                        }
+                        // A9 该回访了
+                        if !dueFollowUps.isEmpty {
+                            Section("该回访了") {
+                                ForEach(dueFollowUps, id: \.0.id) { client, days, threshold in
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(client.company).font(.headline)
+                                            Text("\(days) 天没有新单（\(threshold == 30 ? "企业客户" : "个人客户")·\(threshold)天惯例）")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        Spacer()
+                                        if !client.phone.isEmpty {
+                                            Button {
+                                                if let url = URL(string: "tel://\(client.phone.filter { !$0.isWhitespace && $0 != "-" })") {
+                                                    UIApplication.shared.open(url)
+                                                }
+                                            } label: {
+                                                Image(systemName: "phone.fill")
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                         ForEach(groupedByDay, id: \.0) { day, signings in
@@ -211,16 +253,26 @@ struct SigningListView: View {
     @Binding var data: Store.Data
     @State private var showAdd = false
 
-    /// 本月小结（报税雏形）
-    var monthSummary: (count: Int, income: Double, miles: Double, acts: Int, unpaid: Int) {
+    /// 本月小结 v2（A1账龄/A3净利/A4免税拆分/A7跑趟费/A8类型 全并入）
+    var monthSummary: (count: Int, income: Double, notaryPortion: Double, taxablePortion: Double,
+                       tripFees: Double, miles: Double, acts: Int, netProfit: Double, unpaid: Int,
+                       overdueAmount: Double, overdueCount: Int) {
         let cal = Calendar.current
         let done = data.signings.filter { $0.status == .done && cal.isDate($0.date, equalTo: Date(), toGranularity: .month) }
+        // A1 全量账龄（不限本月——逾期款不管哪月签的）
+        let overdue = data.signings.filter { $0.agingLevel > 0 }
         return (
             done.count,
             done.reduce(0) { $0 + $1.fee },
+            done.reduce(0) { $0 + $1.notaryFeePortion },
+            done.reduce(0) { $0 + $1.taxablePortion },
+            done.reduce(0) { $0 + $1.tripFee },
             done.reduce(0) { $0 + $1.mileage },
             done.reduce(0) { $0 + $1.borrowDocs + $1.trustDocs + $1.otherDocs },
-            data.signings.filter { $0.status == .done && !$0.paid }.count
+            done.reduce(0) { $0 + $1.netProfit },
+            data.signings.filter { $0.status == .done && !$0.paid }.count,
+            overdue.reduce(0) { $0 + $1.fee },
+            overdue.count
         )
     }
 
@@ -242,12 +294,33 @@ struct SigningListView: View {
                     }
                 } else {
                     List {
+                        // A1 拖款账龄警示条（最愤怒痛点置顶）
+                        if monthSummary.overdueCount > 0 {
+                            Section {
+                                Label("\(monthSummary.overdueCount) 单逾期未收，合计 $\(monthSummary.overdueAmount, specifier: "%.0f")（超30天）",
+                                      systemImage: "clock.badge.exclamationmark.fill")
+                                    .font(.footnote)
+                                    .foregroundColor(.red)
+                            }
+                        }
                         Section("本月小结") {
                             HStack {
                                 StatCell("单数", "\(monthSummary.count)")
                                 StatCell("收入", "$" + String(format: "%.0f", monthSummary.income))
+                                StatCell("净利", "$" + String(format: "%.0f", monthSummary.netProfit))
                                 StatCell("里程", String(format: "%.0f", monthSummary.miles) + " mi")
-                                StatCell("公证行为", "\(monthSummary.acts)")
+                            }
+                            // A4 SE 免税拆分两行
+                            HStack(spacing: 16) {
+                                Label("公证费(免税) $" + String(format: "%.0f", monthSummary.notaryPortion), systemImage: "checkmark.shield")
+                                    .foregroundColor(.green)
+                                Label("服务费 $" + String(format: "%.0f", monthSummary.taxablePortion), systemImage: "doc.text")
+                            }
+                            .font(.caption)
+                            if monthSummary.tripFees > 0 {
+                                Label("含跑趟费 $" + String(format: "%.0f", monthSummary.tripFees), systemImage: "car.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
                             }
                             if monthSummary.unpaid > 0 {
                                 Label("\(monthSummary.unpaid) 单已签未收款", systemImage: "exclamationmark.circle")
@@ -262,15 +335,30 @@ struct SigningListView: View {
                                         HStack {
                                             Text(data.clients.first { $0.id == s.clientId }?.company ?? "未知")
                                                 .font(.headline)
+                                            Text(s.serviceType.emoji).font(.caption)
                                             if s.status == .noshow {
                                                 Text("没来").font(.caption2).foregroundColor(.red)
+                                            }
+                                            // A1 账龄色标
+                                            if s.agingLevel > 0 {
+                                                Text("逾期\(s.unpaidDays)天")
+                                                    .font(.caption2)
+                                                    .foregroundColor(s.agingLevel == 2 ? .red : .orange)
                                             }
                                             Spacer()
                                             Text(s.date, style: .date).font(.caption).foregroundColor(.secondary)
                                         }
-                                        Text("$\(s.fee, specifier: "%.0f") · \(s.mileage, specifier: "%.0f") mi · \(s.paid ? "已收" : "未收")")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
+                                        HStack(spacing: 8) {
+                                            Text("$\(s.fee, specifier: "%.0f")")
+                                            Text("· \(s.mileage, specifier: "%.0f") mi")
+                                            Text("· \(s.paid ? "已收" : "未收")")
+                                            // A5 时薪判决色点
+                                            Circle()
+                                                .fill(verdictColor(s))
+                                                .frame(width: 8, height: 8)
+                                        }
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
                                     }
                                 }
                             }
@@ -288,6 +376,14 @@ struct SigningListView: View {
                 SigningEditor(data: $data, preselectedClientId: nil)
             }
         }
+    }
+
+    /// A5 时薪判决色（对照 settings.hourlyFloor）
+    private func verdictColor(_ s: Signing) -> Color {
+        let floor = data.settings.hourlyFloor
+        if s.hourlyNet >= floor { return .green }
+        if s.hourlyNet >= floor * 0.8 { return .yellow }
+        return .red
     }
 
     var sortedDesc: [Signing] {
@@ -337,10 +433,42 @@ struct SigningDetailView: View {
             Section("本单") {
                 LabeledRow("时间", current.date.formatted(date: .long, time: .shortened))
                 if !current.address.isEmpty { LabeledRow("地点", current.address) }
-                LabeledRow("费用", "$" + String(format: "%.0f", current.fee))
+                LabeledRow("类型", current.serviceType.emoji + " " + current.serviceType.rawValue)
+                LabeledRow("总费用", "$" + String(format: "%.0f", current.fee))
+                // A4 拆分显示
+                LabeledRow("└ 公证费(免税)", "$" + String(format: "%.0f", current.notaryFeePortion))
+                LabeledRow("└ 服务费(应税)", "$" + String(format: "%.0f", current.taxablePortion))
+                if current.tripFee > 0 {
+                    LabeledRow("└ 跑趟费", "$" + String(format: "%.0f", current.tripFee))
+                }
                 LabeledRow("里程", String(format: "%.1f", current.mileage) + " mi")
                 LabeledRow("状态", ["已约", "完成", "没来"][statusIndex])
                 LabeledRow("收款", current.paid ? "已收" : "未收")
+                // A1 账龄
+                if current.agingLevel > 0 {
+                    LabeledRow("逾期", "\(current.unpaidDays) 天未收")
+                }
+            }
+            // A5 时薪判决（A3 净利）
+            Section("这单值不值") {
+                HStack {
+                    Text("净利/小时")
+                    Spacer()
+                    Text("$" + String(format: "%.0f", current.hourlyNet) + "/h")
+                        .foregroundColor(verdictColor)
+                }
+                HStack {
+                    Text("门到门")
+                    Spacer()
+                    Text("\(current.doorToDoorMinutes) 分钟")
+                        .foregroundColor(.secondary)
+                }
+                HStack {
+                    Text("判决")
+                    Spacer()
+                    Text(verdictText)
+                        .foregroundColor(verdictColor)
+                }
             }
             Section("公证行为计数") {
                 LabeledRow("借款合同", "\(current.borrowDocs) 份")
@@ -356,6 +484,21 @@ struct SigningDetailView: View {
 
     var statusIndex: Int {
         switch current.status { case .scheduled: return 0; case .done: return 1; case .noshow: return 2 }
+    }
+
+    // A5 时薪判决（对照 settings.hourlyFloor）
+    private var verdictColor: Color {
+        let floor = data.settings.hourlyFloor
+        if current.hourlyNet >= floor { return .green }
+        if current.hourlyNet >= floor * 0.8 { return .yellow }
+        return .red
+    }
+    private var verdictText: String {
+        let floor = data.settings.hourlyFloor
+        if current.hourlyNet >= floor { return "✅ 值得接" }
+        if current.hourlyNet >= floor * 0.8 { return "⚠️ 勉强" }
+        return "🔴 低于地板"
+    }
     }
 }
 
@@ -446,8 +589,39 @@ struct ClientDetailView: View {
         data.signings.filter { $0.clientId == current.id }.sorted { $0.date > $1.date }
     }
 
+    // A2 平均付款天数（done→paidDate）
+    var avgPayDays: Double? {
+        let pairs = mySignings.filter { $0.paid && $0.paidDate != nil }
+        guard !pairs.isEmpty else { return nil }
+        let total = pairs.reduce(0.0) { sum, s in
+            let days = Calendar.current.dateComponents([.day],
+                from: Calendar.current.startOfDay(for: s.completedDate ?? s.date),
+                to: Calendar.current.startOfDay(for: s.paidDate!)).day ?? 0
+            return sum + Double(max(0, days))
+        }
+        return total / Double(pairs.count)
+    }
+
+    // A6 评级三档（从平均付款天数自动推）
+    var rating: (label: String, color: Color) {
+        guard let d = avgPayDays else {
+            return ("未评级（还没收过款）", .secondary)
+        }
+        if d <= 30 { return ("✅ 优选（平均 \(Int(d)) 天付款）", .green) }
+        if d <= 45 { return ("⚠️ 注意（平均 \(Int(d)) 天付款）", .orange) }
+        return ("🔴 拉黑观察（平均 \(Int(d)) 天付款）", .red)
+    }
+
     var body: some View {
         List {
+            // A2/A6 付款速度+评级
+            Section("付款表现") {
+                if let d = avgPayDays {
+                    LabeledRow("平均付款天数", "\(Int(d)) 天")
+                }
+                Label(rating.label, systemImage: "star.fill")
+                    .foregroundColor(rating.color)
+            }
             Section("联系") {
                 if !current.contactName.isEmpty { LabeledRow("联系人", current.contactName) }
                 if !current.phone.isEmpty {

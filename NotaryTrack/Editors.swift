@@ -11,8 +11,12 @@ struct SigningEditor: View {
     @State private var date = Date()
     @State private var address = ""
     @State private var fee = 100.0
+    @State private var notaryFeePortion = 0.0
+    @State private var tripFee = 0.0
     @State private var mileage = 0.0
     @State private var minutes = 60
+    @State private var buffer = 15
+    @State private var serviceType: ServiceType = .loan
     @State private var borrowDocs = 1
     @State private var trustDocs = 0
     @State private var otherDocs = 0
@@ -35,14 +39,34 @@ struct SigningEditor: View {
                     }
                 }
                 Section("时间地点") {
+                    // A8 服务类型
+                    Picker("类型", selection: $serviceType) {
+                        ForEach(ServiceType.allCases, id: \.self) { t in
+                            Text("\(t.emoji) \(t.rawValue)").tag(t)
+                        }
+                    }
                     DatePicker("时间", selection: $date)
                     TextField("签署地点（房产地址）", text: $address)
-                    Stepper("预计 \(minutes) 分钟", value: $minutes, in: 15...240, step: 15)
+                    Stepper("桌上 \(minutes) 分钟", value: $minutes, in: 15...240, step: 15)
+                    Stepper("车程缓冲 \(buffer) 分钟", value: $buffer, in: 0...60, step: 5)
                 }
                 Section("费用与里程") {
                     HStack {
-                        Text("费用 $")
+                        Text("总费用 $")
                         TextField("100", value: $fee, format: .number)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    // A4 公证费拆分
+                    HStack {
+                        Text("其中公证费 $（免税）")
+                        TextField("0", value: $notaryFeePortion, format: .number)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    HStack {
+                        Text("跑趟费 $")
+                        TextField("0", value: $tripFee, format: .number)
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                     }
@@ -52,7 +76,7 @@ struct SigningEditor: View {
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                     }
-                    Text("里程按 IRS 标准可抵税（\($mileage.wrappedValue * 0.7, specifier: "%.0f") 美元抵扣额）")
+                    Text("公证费部分免自雇税（IRS §1402）· 里程按 IRS 标准可抵税（$\(mileage * 0.67, specifier: "%.0f")）")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -88,7 +112,9 @@ struct SigningEditor: View {
     private func save() {
         guard let cid = clientId else { return }
         data.signings.append(Signing(clientId: cid, date: date, address: address, fee: fee,
-                                     mileage: mileage, minutes: minutes, borrowDocs: borrowDocs,
+                                     notaryFeePortion: notaryFeePortion, tripFee: tripFee,
+                                     mileage: mileage, minutes: minutes, driveBufferMinutes: buffer,
+                                     serviceType: serviceType, borrowDocs: borrowDocs,
                                      trustDocs: trustDocs, otherDocs: otherDocs, note: note))
         Store.save(data)
         dismiss()
@@ -107,12 +133,18 @@ struct ClientEditor: View {
     @State private var phone = ""
     @State private var email = ""
     @State private var notes = ""
+    @State private var isBusiness = true
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("客户") {
                     TextField("标题公司/签约服务名", text: $company)
+                    // A9 回访节奏：企业30天/个人90天
+                    Picker("客户类型", selection: $isBusiness) {
+                        Text("企业（30天回访）").tag(true)
+                        Text("个人（90天回访）").tag(false)
+                    }
                 }
                 Section("联系") {
                     TextField("联系人（贷款官/协调员）", text: $contactName)
@@ -144,17 +176,17 @@ struct ClientEditor: View {
 
     private func load() {
         guard let c = existing else { return }
-        company = c.company; contactName = c.contactName; phone = c.phone; email = c.email; notes = c.notes
+        company = c.company; contactName = c.contactName; phone = c.phone; email = c.email; notes = c.notes; isBusiness = c.isBusiness
     }
 
     private func save() {
         if var c = existing {
             if let i = data.clients.firstIndex(where: { $0.id == c.id }) {
-                c.company = company; c.contactName = contactName; c.phone = phone; c.email = email; c.notes = notes
+                c.company = company; c.contactName = contactName; c.phone = phone; c.email = email; c.notes = notes; c.isBusiness = isBusiness
                 data.clients[i] = c
             }
         } else {
-            data.clients.append(Client(company: company, contactName: contactName, phone: phone, email: email, notes: notes))
+            data.clients.append(Client(company: company, contactName: contactName, phone: phone, email: email, notes: notes, isBusiness: isBusiness))
         }
         Store.save(data)
         dismiss()
