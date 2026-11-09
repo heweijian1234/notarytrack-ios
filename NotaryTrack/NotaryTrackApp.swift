@@ -848,8 +848,7 @@ enum NTExporter {
         l.append("状态：\(s.status == .done ? "完成" : s.status == .noshow ? "没成功" : "已约") · \(s.paid ? "已收" : "未收")")
         l.append("公证行为：借款 \(s.borrowDocs) / 信托 \(s.trustDocs) / 其他 \(s.otherDocs)")
         if !s.note.isEmpty { l.append("备注：\(s.note)") }
-        return l.joined(separator: "
-")
+        return l.joined(separator: "\n")
     }
 
     static func monthText(data: Store.Data) -> String {
@@ -883,8 +882,7 @@ enum NTExporter {
             let cn = data.clients.first { $0.id == s.clientId }?.company ?? "?"
             l.append("\(df.string(from: s.date)) \(cn) $\(s.fee, specifier: "%.0f") \(s.mileage, specifier: "%.0f")mi \(s.paid ? "已收" : "未收")")
         }
-        return l.joined(separator: "
-")
+        return l.joined(separator: "\n")
     }
 }
 
