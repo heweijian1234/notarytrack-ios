@@ -406,7 +406,7 @@ struct SigningListView: View {
                                 Label("服务费 $" + String(format: "%.0f", monthSummary.taxablePortion), systemImage: "doc.text")
                             }
                             .font(.caption)
-                            Label("预估自雇税 $\(String(format: \"%.0f\", monthSummary.taxablePortion * 0.153))（应税部分×15.3%）", systemImage: "percent")
+                            Label("预估自雇税 $" + String(format: "%.0f", monthSummary.taxablePortion * 0.153) + "（应税部分×15.3%）", systemImage: "percent")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             if monthSummary.unpaid > 0 {
