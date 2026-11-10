@@ -42,22 +42,22 @@ struct SigningEditor: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("客户") {
+                Section("Client") {
                     if data.clients.isEmpty {
-                        Text("请先在「客户」页添加标题公司。")
+                        Text("Add a client first (Clients tab).")
                             .font(.footnote)
                             .foregroundColor(.orange)
                     } else {
-                        Picker("客户", selection: $clientId) {
+                        Picker("Client", selection: $clientId) {
                             ForEach(data.clients) { c in
                                 Text(c.company).tag(Optional(c.id))
                             }
                         }
                     }
                 }
-                Section("时间地点") {
+                Section("Time & Place") {
                     // A8 服务类型
-                    Picker("类型", selection: $serviceType) {
+                    Picker("Type", selection: $serviceType) {
                         ForEach(ServiceType.allCases, id: \.self) { t in
                             Text("\(t.emoji) \(t.rawValue)").tag(t)
                         }
@@ -65,81 +65,81 @@ struct SigningEditor: View {
                     .onChange(of: serviceType) { t in
                         applyTypeDefaults(t)
                     }
-                    Text("该类型建议：桌上约 \(minutes) 分钟 · 公证费 \(notaryFeeHint)")
+                    Text("Suggested: ~\(minutes) min at the table · notary fee \(notaryFeeHint)")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    DatePicker("时间", selection: $date)
-                    TextField("签署地点（房产地址）", text: $address)
-                    Stepper("桌上 \(minutes) 分钟", value: $minutes, in: 15...240, step: 15)
+                    DatePicker("Date & time", selection: $date)
+                    TextField("Signing location (property address)", text: $address)
+                    Stepper("Table time \(minutes) min", value: $minutes, in: 15...240, step: 15)
                     // 健哥令①：闹钟放车程缓冲下面
-                    Stepper("车程缓冲 \(buffer) 分钟", value: $buffer, in: 0...60, step: 5)
-                    Toggle("提醒（闹钟）", isOn: $remindMe)
+                    Stepper("Drive buffer \(buffer) min", value: $buffer, in: 0...60, step: 5)
+                    Toggle("Reminder (alert)", isOn: $remindMe)
                     if remindMe {
                         // 健哥令①：30/45 分钟加入
-                        Picker("提前", selection: $remindMinutesBefore) {
-                            Text("提前 30 分钟").tag(30)
-                            Text("提前 45 分钟").tag(45)
-                            Text("提前 1 小时").tag(60)
-                            Text("提前 2 小时").tag(120)
-                            Text("提前 3 小时").tag(180)
-                            Text("提前 4 小时").tag(240)
-                            Text("提前 6 小时").tag(360)
-                            Text("提前 10 小时").tag(600)
+                        Picker("Remind me", selection: $remindMinutesBefore) {
+                            Text("30 min before").tag(30)
+                            Text("45 min before").tag(45)
+                            Text("1 hour before").tag(60)
+                            Text("2 hours before").tag(120)
+                            Text("3 hours before").tag(180)
+                            Text("4 hours before").tag(240)
+                            Text("6 hours before").tag(360)
+                            Text("10 hours before").tag(600)
                         }
-                        Text("预约前 \(remindMinutesBefore >= 60 ? "\(remindMinutesBefore / 60) 小时" : "\(remindMinutesBefore) 分钟")通知你出发。")
+                        Text("Notified \(remindMinutesBefore >= 60 ? "\(remindMinutesBefore / 60)h" : "\(remindMinutesBefore) min") before — leave time for the \(buffer) min drive.")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
                 }
-                Section("费用与里程") {
+                Section("Fees & Mileage") {
                     HStack {
-                        Text("总费用 $")
+                        Text("Total fee $")
                         TextField("0", value: $fee, format: .number)
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                     }
                     // A4 公证费拆分
                     HStack {
-                        Text("其中公证费 $（免税）")
+                        Text("Notary portion $ (SE-exempt)")
                         TextField("0", value: $notaryFeePortion, format: .number)
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                     }
                     HStack {
-                        Text("跑趟费 $")
+                        Text("Trip fee $")
                         TextField("0", value: $tripFee, format: .number)
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                     }
                     // 健哥令②：耗材成本自填
                     HStack {
-                        Text("耗材成本 $（打印/纸/墨）")
+                        Text("Supplies $ (print/paper/ink)")
                         TextField("2.5", value: $supplyCost, format: .number)
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                     }
-                    Text("公证费部分免自雇税（IRS §1402）· 净利已含耗材成本")
+                    Text("Notary portion is exempt from self-employment tax (IRC §1402). Net profit includes supply cost.")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                Section("公证行为计数") {
-                    Stepper("借款合同 \(borrowDocs) 份", value: $borrowDocs, in: 0...20)
-                    Stepper("信托文件 \(trustDocs) 份", value: $trustDocs, in: 0...20)
-                    Stepper("其他 \(otherDocs) 份", value: $otherDocs, in: 0...20)
+                Section("Notarial Acts") {
+                    Stepper("Loan docs: \(borrowDocs)", value: $borrowDocs, in: 0...20)
+                    Stepper("Other docs: \(trustDocs)", value: $trustDocs, in: 0...20)
+                    Stepper("Misc acts: \(otherDocs)", value: $otherDocs, in: 0...20)
                 }
-                Section("备注") {
-                    TextField("订单号/特殊要求…", text: $note, axis: .vertical)
+                Section("Notes") {
+                    TextField("Order # / special instructions…", text: $note, axis: .vertical)
                         .lineLimit(2...4)
                 }
             }
-            .navigationTitle("新建签署单")
+            .navigationTitle("New Signing")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") { dismiss() }
+                    Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") { save() }
+                    Button("Save") { save() }
                         .disabled(clientId == nil)
                 }
             }
@@ -202,35 +202,35 @@ struct ClientEditor: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("客户") {
-                    TextField("标题公司/签约服务名", text: $company)
+                Section("Client") {
+                    TextField("Title company / signing service", text: $company)
                     // A9 回访节奏：企业30天/个人90天
-                    Picker("客户类型", selection: $isBusiness) {
-                        Text("企业（30天回访）").tag(true)
-                        Text("个人（90天回访）").tag(false)
+                    Picker("Client type", selection: $isBusiness) {
+                        Text("Business (30-day follow-up)").tag(true)
+                        Text("Individual (90-day follow-up)").tag(false)
                     }
                 }
-                Section("联系") {
-                    TextField("联系人（贷款官/协调员）", text: $contactName)
-                    TextField("电话", text: $phone)
+                Section("Contact") {
+                    TextField("Contact (loan officer / coordinator)", text: $contactName)
+                    TextField("Phone", text: $phone)
                         .keyboardType(.phonePad)
-                    TextField("邮箱", text: $email)
+                    TextField("Email", text: $email)
                         .keyboardType(.emailAddress)
                         .textInputAutocapitalization(.never)
                 }
-                Section("备注") {
-                    TextField("结算周期/偏好/注意事项…", text: $notes, axis: .vertical)
+                Section("Notes") {
+                    TextField("Payment terms / preferences / notes…", text: $notes, axis: .vertical)
                         .lineLimit(3...6)
                 }
             }
-            .navigationTitle(existing == nil ? "新建客户" : "编辑客户")
+            .navigationTitle(existing == nil ? "New Client" : "Edit Client")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") { dismiss() }
+                    Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") { save() }
+                    Button("Save") { save() }
                         .disabled(company.isEmpty)
                 }
             }
@@ -271,31 +271,31 @@ struct CommissionEditor: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("委托证（Notary Commission）") {
-                    TextField("持证人姓名", text: $holderName)
-                    TextField("州（如 CA / TX / FL）", text: $state)
-                    TextField("证号", text: $commissionNumber)
-                    DatePicker("到期日", selection: $expiry, displayedComponents: .date)
+                Section("Notary Commission") {
+                    TextField("Commission holder name", text: $holderName)
+                    TextField("State (CA / TX / FL…)", text: $state)
+                    TextField("Commission number", text: $commissionNumber)
+                    DatePicker("Expiry date", selection: $expiry, displayedComponents: .date)
                 }
                 Section {
                     let days = Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: Date()), to: Calendar.current.startOfDay(for: expiry)).day ?? 0
                     if days < 0 {
-                        Label("已过期 \(-days) 天", systemImage: "exclamationmark.triangle.fill")
+                        Label("Expired \(-days) days ago", systemImage: "exclamationmark.triangle.fill")
                             .foregroundColor(.red)
                     } else if days <= 90 {
-                        Label("\(days) 天后到期——建议开始续证", systemImage: "exclamationmark.triangle")
+                        Label("Expires in \(days) days — start renewal", systemImage: "exclamationmark.triangle")
                             .foregroundColor(.orange)
                     } else {
-                        Label("\(days) 天后到期", systemImage: "checkmark.circle")
+                        Label("Expires in \(days) days", systemImage: "checkmark.circle")
                             .foregroundColor(.green)
                     }
                 }
             }
-            .navigationTitle("委托证设置")
+            .navigationTitle("Commission")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") { dismiss() }
+                    Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("保存") {

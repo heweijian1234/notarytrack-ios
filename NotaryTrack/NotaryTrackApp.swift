@@ -18,16 +18,16 @@ struct RootView: View {
     var body: some View {
         TabView(selection: $tab) {
             TodayView(data: $data)
-                .tabItem { Label("今日", systemImage: "calendar") }
+                .tabItem { Label("Today", systemImage: "calendar") }
                 .tag(0)
             SigningListView(data: $data)
-                .tabItem { Label("签署单", systemImage: "doc.text") }
+                .tabItem { Label("Signings", systemImage: "doc.text") }
                 .tag(1)
             ClientListView(data: $data)
-                .tabItem { Label("客户", systemImage: "person.2") }
+                .tabItem { Label("Clients", systemImage: "person.2") }
                 .tag(2)
             FeedbackView()
-                .tabItem { Label("我的", systemImage: "person.crop.circle") }
+                .tabItem { Label("Me", systemImage: "person.crop.circle") }
                 .tag(3)
         }
         .onAppear { data = Store.load() }
@@ -80,9 +80,9 @@ struct TodayView: View {
                         Image(systemName: "stamp")
                             .font(.system(size: 52))
                             .foregroundColor(.indigo)
-                        Text("你的签署代理台账")
+                        Text("Your signing agent book")
                             .font(.headline)
-                        Text("先加客户（标题公司），再录签署单。费用、跑趟费、公证行为数，一单不漏。")
+                        Text("Add a client (title company) first, then log signings. Fees, trip fees, notarial acts — nothing missed.")
                             .font(.footnote)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
@@ -99,12 +99,12 @@ struct TodayView: View {
                         }
                         // A9 该回访了
                         if !dueFollowUps.isEmpty {
-                            Section("该回访了") {
+                            Section("Due for follow-up") {
                                 ForEach(dueFollowUps, id: \.0.id) { client, days, threshold in
                                     HStack {
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(client.company).font(.headline)
-                                            Text("\(days) 天没有新单（\(threshold == 30 ? "企业客户" : "个人客户")·\(threshold)天惯例）")
+                                            Text("\(days) days since last signing (\(threshold == 30 ? "business" : "individual") · \(threshold)-day norm)")
                                                 .font(.caption)
                                                 .foregroundColor(.secondary)
                                         }
@@ -130,19 +130,19 @@ struct TodayView: View {
                             }
                         }
                         if data.signings.isEmpty {
-                            Text("还没有签署单——点右上角添加。")
+                            Text("No signings yet — tap + to add.")
                                 .font(.footnote)
                                 .foregroundColor(.secondary)
                         }
                     }
                 }
             }
-            .navigationTitle("今日")
+            .navigationTitle("Today")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
-                        Button { showAdd = true } label: { Label("新建签署单", systemImage: "plus") }
-                        Button { showCommission = true } label: { Label("委托证设置", systemImage: "credentialing") }
+                        Button { showAdd = true } label: { Label("New Signing", systemImage: "plus") }
+                        Button { showCommission = true } label: { Label("Commission", systemImage: "credentialing") }
                     } label: { Image(systemName: "ellipsis.circle") }
                 }
             }
@@ -185,7 +185,7 @@ struct SigningRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text(client?.company ?? "未知客户")
+                Text(client?.company ?? "Unknown client")
                     .font(.headline)
                 Spacer()
                 Text(tf.string(from: signing.date))
@@ -194,12 +194,12 @@ struct SigningRow: View {
             }
             HStack(spacing: 10) {
                 Label("$\(signing.fee, specifier: "%.0f")", systemImage: "dollarsign.circle")
-                Label("跑趟费 $" + String(format: "%.0f", signing.tripFee), systemImage: "car")
+                Label("Trip fee $" + String(format: "%.0f", signing.tripFee), systemImage: "car")
                 if signing.paid {
-                    Label("已收款", systemImage: "checkmark.seal")
+                    Label("Paid", systemImage: "checkmark.seal")
                         .foregroundColor(.green)
                 } else {
-                    Label("未收", systemImage: "hourglass")
+                    Label("Unpaid", systemImage: "hourglass")
                         .foregroundColor(.orange)
                 }
             }
@@ -210,7 +210,7 @@ struct SigningRow: View {
                 Button {
                     update(.done)
                 } label: {
-                    Label("完成", systemImage: "checkmark.circle.fill")
+                    Label("Done", systemImage: "checkmark.circle.fill")
                         .font(.caption)
                 }
                 .buttonStyle(.bordered)
@@ -218,7 +218,7 @@ struct SigningRow: View {
                 Button {
                     update(.noshow)
                 } label: {
-                    Label("没来", systemImage: "xmark.circle")
+                    Label("No-show", systemImage: "xmark.circle")
                         .font(.caption)
                 }
                 .buttonStyle(.bordered)
@@ -227,7 +227,7 @@ struct SigningRow: View {
                     Button {
                         markPaid()
                     } label: {
-                        Label("标记已收款", systemImage: "dollarsign.arrow.circlepath")
+                        Label("Mark Paid", systemImage: "dollarsign.arrow.circlepath")
                             .font(.caption)
                     }
                     .buttonStyle(.borderedProminent)
@@ -263,9 +263,9 @@ struct SigningRowMetrics: View {
     var body: some View {
         HStack(spacing: 8) {
             Text("$" + String(format: "%.0f", s.fee))
-            Text("· 净利 $" + String(format: "%.0f", s.netProfit(supplyCost: 2.50)))
+            Text("· Net $" + String(format: "%.0f", s.netProfit(supplyCost: 2.50)))
             if s.tripFee > 0 {
-                Text("· 跑趟费 $" + String(format: "%.0f", s.tripFee))
+                Text("· Trip fee $" + String(format: "%.0f", s.tripFee))
             }
             Text("· " + (s.paid ? "已收" : "未收"))
         }
@@ -286,10 +286,10 @@ struct SigningRowHeader: View {
                 .font(.headline)
             Text(s.serviceType.emoji).font(.caption)
             if s.status == .noshow {
-                Text("没来").font(.caption2).foregroundColor(.red)
+                Text("No-show").font(.caption2).foregroundColor(.red)
             }
             if s.agingLevel > 0 {
-                Text("逾期\(s.unpaidDays)天")
+                Text("Overdue \(s.unpaidDays)d")
                     .font(.caption2)
                     .foregroundColor(s.agingLevel == 2 ? .red : .orange)
             }
@@ -378,9 +378,9 @@ struct SigningListView: View {
                         Image(systemName: "doc.text")
                             .font(.system(size: 52))
                             .foregroundColor(.indigo)
-                        Text("还没有签署单")
+                        Text("No signings yet")
                             .font(.headline)
-                        Text("录第一单：客户、费用、里程、公证行为数。")
+                        Text("Log your first signing: client, fee, mileage, notarial acts.")
                             .font(.footnote)
                             .foregroundColor(.secondary)
                         Spacer()
@@ -391,50 +391,50 @@ struct SigningListView: View {
                         if monthSummary.overdueCount > 0 {
                             Section {
                                 NavigationLink(destination: OverdueListView(overdue: overdueSignings, data: $data)) {
-                                    Label("\(monthSummary.overdueCount) 单逾期未收，合计 $\(monthSummary.overdueAmount, specifier: "%.0f")（超30天）",
+                                    Label("\(monthSummary.overdueCount) overdue, totaling $\(monthSummary.overdueAmount, specifier: \"%.0f\") (30+ days)",
                                           systemImage: "clock.badge.exclamationmark.fill")
                                         .font(.footnote)
                                         .foregroundColor(.red)
                                 }
                             }
                         }
-                        Section("本月小结") {
+                        Section("This Month") {
                             HStack {
-                                StatCell("单数", "\(monthSummary.count)")
-                                StatCell("收入", "$" + String(format: "%.0f", monthSummary.income))
-                                StatCell("净利", "$" + String(format: "%.0f", monthSummary.netProfit))
-                                StatCell("跑趟费", "$" + String(format: "%.0f", monthSummary.tripFees))
+                                StatCell("Signings", "\(monthSummary.count)")
+                                StatCell("Income", "$" + String(format: "%.0f", monthSummary.income))
+                                StatCell("Net", "$" + String(format: "%.0f", monthSummary.netProfit))
+                                StatCell("Trip fees", "$" + String(format: "%.0f", monthSummary.tripFees))
                             }
                             // A4 SE 免税拆分 + 税预估
                             HStack(spacing: 16) {
-                                Label("公证费(免税) $" + String(format: "%.0f", monthSummary.notaryPortion), systemImage: "checkmark.shield")
+                                Label("Notary (SE-exempt) $" + String(format: "%.0f", monthSummary.notaryPortion), systemImage: "checkmark.shield")
                                     .foregroundColor(.green)
-                                Label("服务费 $" + String(format: "%.0f", monthSummary.taxablePortion), systemImage: "doc.text")
+                                Label("Service $" + String(format: "%.0f", monthSummary.taxablePortion), systemImage: "doc.text")
                             }
                             .font(.caption)
-                            Label("预估自雇税 $" + String(format: "%.0f", monthSummary.taxablePortion * 0.153) + "（应税部分×15.3%）", systemImage: "percent")
+                            Label("Est. SE tax $" + String(format: "%.0f", monthSummary.taxablePortion * 0.153) + "（应税部分×15.3%）", systemImage: "percent")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             if monthSummary.unpaid > 0 {
-                                Label("\(monthSummary.unpaid) 单已签未收款", systemImage: "exclamationmark.circle")
+                                Label("\(monthSummary.unpaid) signings unpaid", systemImage: "exclamationmark.circle")
                                     .font(.footnote)
                                     .foregroundColor(.orange)
                             }
                         }
                         // 健哥令②：年度累计
-                        Section("年度累计（今年至今）") {
+                        Section("Year to Date") {
                             HStack {
-                                StatCell("单数", "\(yearSummary.count)")
-                                StatCell("净利", "$" + String(format: "%.0f", yearSummary.netProfit))
+                                StatCell("Signings", "\(yearSummary.count)")
+                                StatCell("Net", "$" + String(format: "%.0f", yearSummary.netProfit))
                             }
                             HStack(spacing: 16) {
-                                Label("公证费(免税) $" + String(format: "%.0f", yearSummary.notaryPortion), systemImage: "checkmark.shield")
+                                Label("Notary (SE-exempt) $" + String(format: "%.0f", yearSummary.notaryPortion), systemImage: "checkmark.shield")
                                     .foregroundColor(.green)
-                                Label("服务费 $" + String(format: "%.0f", yearSummary.taxablePortion), systemImage: "doc.text")
+                                Label("Service $" + String(format: "%.0f", yearSummary.taxablePortion), systemImage: "doc.text")
                             }
                             .font(.caption)
                         }
-                        Section("全部签署单") {
+                        Section("All Signings") {
                             ForEach(sortedDesc) { s in
                                 SigningListRow(s: s, data: $data, sortedDesc: sortedDesc)
                             }
@@ -450,7 +450,7 @@ struct SigningListView: View {
                     }
                 }
             }
-            .navigationTitle("签署单")
+            .navigationTitle("Signings")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button { showAdd = true } label: { Image(systemName: "plus") }
@@ -495,7 +495,7 @@ struct SigningDetailView: View {
 
     var body: some View {
         List {
-            Section("客户") {
+            Section("Clients") {
                 if let client {
                     NavigationLink(destination: ClientDetailView(client: client, data: $data)) {
                         VStack(alignment: .leading) {
@@ -507,54 +507,54 @@ struct SigningDetailView: View {
                     }
                 }
             }
-            Section("本单") {
-                LabeledRow("时间", current.date.formatted(date: .long, time: .shortened))
-                if !current.address.isEmpty { LabeledRow("地点", current.address) }
-                LabeledRow("类型", current.serviceType.emoji + " " + current.serviceType.rawValue)
-                LabeledRow("总费用", "$" + String(format: "%.0f", current.fee))
+            Section("This Signing") {
+                LabeledRow("Date", current.date.formatted(date: .long, time: .shortened))
+                if !current.address.isEmpty { LabeledRow("Location", current.address) }
+                LabeledRow("Type", current.serviceType.display)
+                LabeledRow("Total fee", "$" + String(format: "%.0f", current.fee))
                 // A4 拆分显示
-                LabeledRow("└ 公证费(免税)", "$" + String(format: "%.0f", current.notaryFeePortion))
-                LabeledRow("└ 服务费(应税)", "$" + String(format: "%.0f", current.taxablePortion))
+                LabeledRow("├ Notary (exempt)", "$" + String(format: "%.0f", current.notaryFeePortion))
+                LabeledRow("├ Service (taxable)", "$" + String(format: "%.0f", current.taxablePortion))
                 if current.tripFee > 0 {
-                    LabeledRow("└ 跑趟费", "$" + String(format: "%.0f", current.tripFee))
+                    LabeledRow("├ Trip fee", "$" + String(format: "%.0f", current.tripFee))
                 }
-                LabeledRow("净利(扣耗材)", "$" + String(format: "%.2f", current.netProfit(supplyCost: data.settings.supplyCostPerSigning)))
-                                LabeledRow("状态", ["已约", "完成", "没来"][statusIndex])
-                LabeledRow("收款", current.paid ? "已收" : "未收")
+                LabeledRow("Net (after supplies)", "$" + String(format: "%.2f", current.netProfit(supplyCost: data.settings.supplyCostPerSigning)))
+                                LabeledRow("Status", ["Scheduled", "Done", "No-show"][statusIndex])
+                LabeledRow("Payment", current.paid ? "Paid" : "Unpaid")
                 // A1 账龄
                 if current.agingLevel > 0 {
-                    LabeledRow("逾期", "\(current.unpaidDays) 天未收")
+                    LabeledRow("Overdue", "\(current.unpaidDays) days unpaid")
                 }
             }
-            Section("公证行为计数") {
-                LabeledRow("借款合同", "\(current.borrowDocs) 份")
-                LabeledRow("信托文件", "\(current.trustDocs) 份")
-                LabeledRow("其他", "\(current.otherDocs) 份")
+            Section("Notarial Acts") {
+                LabeledRow("Loan docs", "\(current.borrowDocs)")
+                LabeledRow("Trust docs", "\(current.trustDocs)")
+                LabeledRow("Other", "\(current.otherDocs)")
             }
             // 健哥令③：后续处理——未收→标记已收（清账龄）；已收→改回未收
             if current.status == .done {
-                Section("收款处理") {
+                Section("Payment") {
                     if current.paid {
                         Button(role: .destructive) {
                             markUnpaid()
                         } label: {
-                            Label("改回未收款", systemImage: "arrow.uturn.backward")
+                            Label("Mark Unpaid", systemImage: "arrow.uturn.backward")
                         }
                     } else {
                         Button {
                             markPaid()
                         } label: {
-                            Label("标记已收款（清逾期）", systemImage: "checkmark.seal.fill")
+                            Label("Mark Paid (clear overdue)", systemImage: "checkmark.seal.fill")
                         }
                         .buttonStyle(.borderedProminent)
                     }
                 }
             }
             if !current.note.isEmpty {
-                Section("备注") { Text(current.note) }
+                Section("Notes") { Text(current.note) }
             }
         }
-        .navigationTitle("签署单详情")
+        .navigationTitle("Signing Details")
     }
 
     var statusIndex: Int {
@@ -612,9 +612,9 @@ struct ClientListView: View {
                         Image(systemName: "person.2")
                             .font(.system(size: 52))
                             .foregroundColor(.indigo)
-                        Text("还没有客户")
+                        Text("No clients yet")
                             .font(.headline)
-                        Text("客户=标题公司/签约服务。记录联系人和结算习惯。")
+                        Text("Clients are title companies / signing services. Track contacts and payment habits.")
                             .font(.footnote)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
@@ -629,11 +629,11 @@ struct ClientListView: View {
                                     HStack {
                                         Text(c.company).font(.headline)
                                         if c.noShowCount > 0 {
-                                            Text("\(c.noShowCount) 次改期").font(.caption2).foregroundColor(.orange)
+                                            Text("\(c.noShowCount) no-shows").font(.caption2).foregroundColor(.orange)
                                         }
                                     }
                                     let count = data.signings.filter { $0.clientId == c.id }.count
-                                    Text("\(count) 单 · \(c.contactName.isEmpty ? "无联系人" : c.contactName)")
+                                    Text("\(count) signings · \(c.contactName.isEmpty ? "无联系人" : c.contactName)")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
@@ -643,7 +643,7 @@ struct ClientListView: View {
                     }
                 }
             }
-            .navigationTitle("客户")
+            .navigationTitle("Clients")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button { showAdd = true } label: { Image(systemName: "plus") }
@@ -694,15 +694,15 @@ struct ClientDetailView: View {
     var body: some View {
         List {
             // A2/A6 付款速度+评级
-            Section("付款表现") {
+            Section("Payment Behavior") {
                 if let d = avgPayDays {
-                    LabeledRow("平均付款天数", "\(Int(d)) 天")
+                    LabeledRow("Avg days to pay", "\(Int(d))")
                 }
                 Label(rating.label, systemImage: "star.fill")
                     .foregroundColor(rating.color)
             }
-            Section("联系") {
-                if !current.contactName.isEmpty { LabeledRow("联系人", current.contactName) }
+            Section("Contact") {
+                if !current.contactName.isEmpty { LabeledRow("Contact", current.contactName) }
                 if !current.phone.isEmpty {
                     Link(destination: URL(string: "tel://\(current.phone.filter { !$0.isWhitespace })")!) {
                         Label(current.phone, systemImage: "phone")
@@ -715,17 +715,17 @@ struct ClientDetailView: View {
                 }
             }
             if !current.notes.isEmpty {
-                Section("备注") { Text(current.notes) }
+                Section("Notes") { Text(current.notes) }
             }
             if current.noShowCount > 0 {
                 Section {
-                    Label("\(current.noShowCount) 次改期/放鸽子", systemImage: "exclamationmark.triangle")
+                    Label("\(current.noShowCount) no-shows on record", systemImage: "exclamationmark.triangle")
                         .foregroundColor(.orange)
                 }
             }
-            Section("签署历史") {
+            Section("Signing History") {
                 if mySignings.isEmpty {
-                    Text("还没有单").font(.footnote).foregroundColor(.secondary)
+                    Text("No signings yet").font(.footnote).foregroundColor(.secondary)
                 } else {
                     ForEach(mySignings.prefix(10)) { s in
                         HStack {
@@ -760,13 +760,13 @@ struct FeedbackView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("反馈意见") {
+                Section("Feedback") {
                     TextEditor(text: $feedbackText)
                         .frame(minHeight: 120)
                         .overlay(
                             Group {
                                 if feedbackText.isEmpty {
-                                    Text("哪里出现了错误？用着哪里不顺？缺什么功能？直接写。")
+                                    Text("Any errors? Anything clunky? Missing features? Just write it.")
                                         .foregroundColor(.secondary)
                                         .font(.footnote)
                                         .padding(.top, 8)
@@ -789,10 +789,10 @@ struct FeedbackView: View {
                     }
                     .disabled(feedbackText.isEmpty)
                 } footer: {
-                    Text("反馈通过邮件直达开发者，不留任何数据在 App 里。")
+                    Text("Feedback goes straight to the developer by email. Nothing is stored in the app.")
                 }
             }
-            .navigationTitle("我的")
+            .navigationTitle("Me")
             .navigationBarTitleDisplayMode(.inline)
         }
     }
@@ -810,16 +810,16 @@ struct OverdueListView: View {
     var body: some View {
         List {
             Section {
-                LabeledRow("逾期单数", "\(overdue.count) 单")
-                LabeledRow("逾期合计", "$" + String(format: "%.0f", total))
+                LabeledRow("Overdue signings", "\(overdue.count)")
+                LabeledRow("Total overdue", "$" + String(format: "%.0f", total))
             }
-            Section("逐单处理") {
+            Section("Process Each") {
                 ForEach(overdue.sorted { $0.unpaidDays > $1.unpaidDays }) { s in
                     OverdueRow(signing: s, data: $data)
                 }
             }
         }
-        .navigationTitle("逾期未收")
+        .navigationTitle("Overdue")
     }
 }
 
@@ -832,13 +832,13 @@ struct OverdueRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text(client?.company ?? "未知客户").font(.headline)
+                Text(client?.company ?? "Unknown client").font(.headline)
                 Spacer()
                 Text("$\(signing.fee, specifier: "%.0f")").font(.headline)
             }
             HStack {
                 // 账龄色标
-                Text("逾期 \(signing.unpaidDays) 天")
+                Text("Overdue \(signing.unpaidDays) days")
                     .font(.caption)
                     .foregroundColor(signing.agingLevel == 2 ? .red : .orange)
                 Spacer()
@@ -849,7 +849,7 @@ struct OverdueRow: View {
                         Store.save(data)
                     }
                 } label: {
-                    Label("已收款", systemImage: "checkmark.seal.fill")
+                    Label("Mark Paid", systemImage: "checkmark.seal.fill")
                         .font(.caption)
                 }
                 .buttonStyle(.borderedProminent)
