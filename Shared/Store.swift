@@ -59,7 +59,11 @@ struct Signing: Codable, Identifiable, Equatable {
     var completedDate: Date?    // A1：完成日（账龄计时起点；nil=用 date）
     var note: String
 
-    enum Status: String, Codable { case scheduled, done, noshow }
+    enum Status: String, Codable { case scheduled, done, noshow
+        var display: String {
+            switch self { case .scheduled: return "Scheduled"; case .done: return "Done"; case .noshow: return "No-show" }
+        }
+    }
 
     init(id: UUID = UUID(), clientId: UUID, date: Date, address: String = "", fee: Double = 0,
          notaryFeePortion: Double = 0, tripFee: Double = 0, minutes: Int = 60,

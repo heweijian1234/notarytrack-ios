@@ -871,7 +871,7 @@ enum NTExporter {
         l.append("【签署单】\(client?.company ?? "未知客户")")
         l.append("时间：\(df.string(from: s.date))")
         if !s.address.isEmpty { l.append("地点：\(s.address)") }
-        l.append("类型：\(s.serviceType.rawValue)")
+        l.append("Type: " + s.serviceType.display)
         l.append("总费用：$" + String(format: "%.0f", s.fee) + "（公证费免税 $" + String(format: "%.0f", s.notaryFeePortion) + " + 服务费应税 $" + String(format: "%.0f", s.taxablePortion) + "）")
         if s.tripFee > 0 { l.append("跑趟费：$" + String(format: "%.0f", s.tripFee)) }
         l.append("耗材：$" + String(format: "%.2f", settings.supplyCostPerSigning))

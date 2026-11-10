@@ -59,7 +59,7 @@ struct SigningEditor: View {
                     // A8 服务类型
                     Picker("Type", selection: $serviceType) {
                         ForEach(ServiceType.allCases, id: \.self) { t in
-                            Text("\(t.emoji) \(t.rawValue)").tag(t)
+                            Text("\(t.emoji) \(t.display)").tag(t)
                         }
                     }
                     .onChange(of: serviceType) { t in
