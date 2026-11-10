@@ -47,7 +47,6 @@ struct Signing: Codable, Identifiable, Equatable {
     var fee: Double             // 本单总费用（$）
     var notaryFeePortion: Double // A4：其中公证行为费（SE 免税部分，州定价×签数）
     var tripFee: Double         // A7：跑趟费（no-show/redraw/等待超时场景单列）
-    var mileage: Double         // 实际往返里程（mi，报税扣税依据 N2）
     var minutes: Int            // 桌上耗时（分钟）
     var driveBufferMinutes: Int // A5 分母补全：车程缓冲（分钟）
     var serviceType: ServiceType // A8：服务类型
@@ -63,7 +62,7 @@ struct Signing: Codable, Identifiable, Equatable {
     enum Status: String, Codable { case scheduled, done, noshow }
 
     init(id: UUID = UUID(), clientId: UUID, date: Date, address: String = "", fee: Double = 0,
-         notaryFeePortion: Double = 0, tripFee: Double = 0, mileage: Double = 0, minutes: Int = 60,
+         notaryFeePortion: Double = 0, tripFee: Double = 0, minutes: Int = 60,
          driveBufferMinutes: Int = 15, serviceType: ServiceType = .loan,
          borrowDocs: Int = 0, trustDocs: Int = 0, otherDocs: Int = 0,
          status: Status = .scheduled, paid: Bool = false, paidDate: Date? = nil,
@@ -75,7 +74,6 @@ struct Signing: Codable, Identifiable, Equatable {
         self.fee = fee
         self.notaryFeePortion = notaryFeePortion
         self.tripFee = tripFee
-        self.mileage = mileage
         self.minutes = minutes
         self.driveBufferMinutes = driveBufferMinutes
         self.serviceType = serviceType
@@ -111,32 +109,21 @@ struct Signing: Codable, Identifiable, Equatable {
     /// A4 服务费（应税部分）= 总费 - 公证费免税部分
     var taxablePortion: Double { fee - notaryFeePortion }
 
-    /// A3/A5 净利（粗算）：费用 - 里程成本(IRS $0.67/mi) - 耗材($2.50/单默认)
-    var netProfit: Double {
-        fee - mileage * 0.67 - 2.50
+    /// A3 净利 = 总费用 + 跑趟费 - 耗材（v1.4 健哥令：里程取消，耗材单价外部传入）
+    func netProfit(supplyCost: Double) -> Double {
+        fee + tripFee - supplyCost
     }
 
-    /// A5 门到门总分钟（桌上+车程缓冲）
-    var doorToDoorMinutes: Int { minutes + driveBufferMinutes }
 
-    /// A5 时薪（净利/门到门小时）
-    var hourlyNet: Double {
-        let hours = Double(doorToDoorMinutes) / 60.0
-        return hours > 0 ? netProfit / hours : 0
-    }
 }
 
 // MARK: - 设置（A5 时薪地板 + A3 耗材单价，全局）
 
 struct AppSettings: Codable, Equatable {
-    var hourlyFloor: Double       // A5：最低时薪地板（默认 $40）
     var supplyCostPerSigning: Double  // A3：单均耗材成本（默认 $2.50）
-    var mileageRate: Double       // 里程抵税单价（默认 IRS $0.67）
 
-    init(hourlyFloor: Double = 40, supplyCostPerSigning: Double = 2.50, mileageRate: Double = 0.67) {
-        self.hourlyFloor = hourlyFloor
+    init(supplyCostPerSigning: Double = 2.50) {
         self.supplyCostPerSigning = supplyCostPerSigning
-        self.mileageRate = mileageRate
     }
 }
 
@@ -165,7 +152,7 @@ struct Commission: Codable, Equatable {
 // MARK: - 存储 v2（v1 数据自动迁移：新字段给默认值）
 
 enum Store {
-    static let key = "notarytrack.data.v2"
+    static let key = "notarytrack.data.v3"
 
     struct Data: Codable {
         var clients: [Client] = []
@@ -192,7 +179,7 @@ enum Store {
         // 旧单迁移：fee 全部归入应税服务费（公证费拆分让用户后续手动补）
         d.signings = old.signings.map { s in
             var ns = Signing(id: s.id, clientId: s.clientId, date: s.date, address: s.address,
-                             fee: s.fee, mileage: s.mileage, minutes: s.minutes,
+                             fee: s.fee, minutes: s.minutes,
                              borrowDocs: s.borrowDocs, trustDocs: s.trustDocs, otherDocs: s.otherDocs,
                              status: s.status, paid: s.paid, note: s.note)
             ns.notaryFeePortion = 0

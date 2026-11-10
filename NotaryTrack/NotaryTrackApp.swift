@@ -82,7 +82,7 @@ struct TodayView: View {
                             .foregroundColor(.indigo)
                         Text("你的签署代理台账")
                             .font(.headline)
-                        Text("先加客户（标题公司），再录签署单。费用、里程、公证行为数，一单不漏。")
+                        Text(L("Add clients (title companies) first, then log signings. Fees, trip fees, notarial acts — nothing missed.", "先加客户（标题公司），再录签署单。费用、跑趟费、公证行为数，一单不漏。"))
                             .font(.footnote)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
@@ -194,7 +194,7 @@ struct SigningRow: View {
             }
             HStack(spacing: 10) {
                 Label("$\(signing.fee, specifier: "%.0f")", systemImage: "dollarsign.circle")
-                Label("\(signing.mileage, specifier: "%.0f") mi", systemImage: "car")
+                Label("跑趟费 $" + String(format: "%.0f", signing.tripFee), systemImage: "car")
                 if signing.paid {
                     Label("已收款", systemImage: "checkmark.seal")
                         .foregroundColor(.green)
@@ -259,17 +259,14 @@ struct SigningRow: View {
 
 struct SigningRowMetrics: View {
     let s: Signing
-    let verdict: Color
 
     var body: some View {
         HStack(spacing: 8) {
             Text("$" + String(format: "%.0f", s.fee))
-            Text("· 净利 $" + String(format: "%.0f", s.netProfit))
-            Text("· " + String(format: "%.0f", s.mileage) + " mi")
+            if s.tripFee > 0 {
+                Text("· 跑趟费 $" + String(format: "%.0f", s.tripFee))
+            }
             Text("· " + (s.paid ? "已收" : "未收"))
-            Circle()
-                .fill(verdict)
-                .frame(width: 8, height: 8)
         }
         .font(.caption)
         .foregroundColor(.secondary)
@@ -307,7 +304,6 @@ struct SigningListRow: View {
     let s: Signing
     @Binding var data: Store.Data
     let sortedDesc: [Signing]
-    let verdictColor: (Signing) -> Color
 
     private var clientName: String {
         data.clients.first { $0.id == s.clientId }?.company ?? "未知"
@@ -317,7 +313,7 @@ struct SigningListRow: View {
         NavigationLink(destination: SigningDetailView(signing: s, data: $data)) {
             VStack(alignment: .leading, spacing: 2) {
                 SigningRowHeader(s: s, clientName: clientName)
-                SigningRowMetrics(s: s, verdict: verdictColor(s))
+                SigningRowMetrics(s: s)
             }
         }
     }
@@ -331,13 +327,12 @@ struct SigningListView: View {
     @State private var exportText: String?
     @State private var showExport = false
 
-    /// 本月小结 v2（A1账龄/A3净利/A4免税拆分/A7跑趟费/A8类型 全并入）
+    /// 本月小结 v3（健哥令：删里程删净利；保留账龄/免税拆分/跑趟费）
     var monthSummary: (count: Int, income: Double, notaryPortion: Double, taxablePortion: Double,
-                       tripFees: Double, miles: Double, acts: Int, netProfit: Double, unpaid: Int,
+                       tripFees: Double, acts: Int, unpaid: Int,
                        overdueAmount: Double, overdueCount: Int) {
         let cal = Calendar.current
         let done = data.signings.filter { $0.status == .done && cal.isDate($0.date, equalTo: Date(), toGranularity: .month) }
-        // A1 全量账龄（不限本月——逾期款不管哪月签的）
         let overdue = data.signings.filter { $0.agingLevel > 0 }
         return (
             done.count,
@@ -345,12 +340,21 @@ struct SigningListView: View {
             done.reduce(0) { $0 + $1.notaryFeePortion },
             done.reduce(0) { $0 + $1.taxablePortion },
             done.reduce(0) { $0 + $1.tripFee },
-            done.reduce(0) { $0 + $1.mileage },
             done.reduce(0) { $0 + $1.borrowDocs + $1.trustDocs + $1.otherDocs },
-            done.reduce(0) { $0 + $1.netProfit },
             data.signings.filter { $0.status == .done && !$0.paid }.count,
             overdue.reduce(0) { $0 + $1.fee },
             overdue.count
+        )
+    }
+
+    /// 健哥令②：年度累计（今年至今——报税直用）
+    var yearSummary: (count: Int, notaryPortion: Double, taxablePortion: Double) {
+        let cal = Calendar.current
+        let done = data.signings.filter { $0.status == .done && cal.isDate($0.date, equalTo: Date(), toGranularity: .year) }
+        return (
+            done.count,
+            done.reduce(0) { $0 + $1.notaryFeePortion },
+            done.reduce(0) { $0 + $1.taxablePortion }
         )
     }
 
@@ -392,30 +396,36 @@ struct SigningListView: View {
                             HStack {
                                 StatCell("单数", "\(monthSummary.count)")
                                 StatCell("收入", "$" + String(format: "%.0f", monthSummary.income))
-                                StatCell("净利", "$" + String(format: "%.0f", monthSummary.netProfit))
-                                StatCell("里程", String(format: "%.0f", monthSummary.miles) + " mi")
+                                StatCell("跑趟费", "$" + String(format: "%.0f", monthSummary.tripFees))
+                                StatCell("公证行为", "\(monthSummary.acts)")
                             }
-                            // A4 SE 免税拆分两行
+                            // A4 SE 免税拆分 + 税预估
                             HStack(spacing: 16) {
                                 Label("公证费(免税) $" + String(format: "%.0f", monthSummary.notaryPortion), systemImage: "checkmark.shield")
                                     .foregroundColor(.green)
                                 Label("服务费 $" + String(format: "%.0f", monthSummary.taxablePortion), systemImage: "doc.text")
                             }
                             .font(.caption)
-                            if monthSummary.tripFees > 0 {
-                                Label("含跑趟费 $" + String(format: "%.0f", monthSummary.tripFees), systemImage: "car.fill")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
+                            Label("预估自雇税 $\(String(format: \"%.0f\", monthSummary.taxablePortion * 0.153))（应税部分×15.3%）", systemImage: "percent")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                             if monthSummary.unpaid > 0 {
                                 Label("\(monthSummary.unpaid) 单已签未收款", systemImage: "exclamationmark.circle")
                                     .font(.footnote)
                                     .foregroundColor(.orange)
                             }
                         }
+                        // 健哥令②：年度累计
+                        Section("年度累计（今年至今）") {
+                            HStack {
+                                StatCell("单数", "\(yearSummary.count)")
+                                StatCell("公证费(免税)", "$" + String(format: "%.0f", yearSummary.notaryPortion))
+                                StatCell("服务费(应税)", "$" + String(format: "%.0f", yearSummary.taxablePortion))
+                            }
+                        }
                         Section("全部签署单") {
                             ForEach(sortedDesc) { s in
-                                SigningListRow(s: s, data: $data, sortedDesc: sortedDesc, verdictColor: verdictColor)
+                                SigningListRow(s: s, data: $data, sortedDesc: sortedDesc)
                             }
                             // 健哥令④：左滑删除（onDelete 必须挂在 ForEach 直接内容上）
                             .onDelete { offsets in
@@ -441,13 +451,6 @@ struct SigningListView: View {
         }
     }
 
-    /// A5 时薪判决色（对照 settings.hourlyFloor）
-    private func verdictColor(_ s: Signing) -> Color {
-        let floor = data.settings.hourlyFloor
-        if s.hourlyNet >= floor { return .green }
-        if s.hourlyNet >= floor * 0.8 { return .yellow }
-        return .red
-    }
 
     var sortedDesc: [Signing] {
         data.signings.sorted { $0.date > $1.date }
@@ -504,37 +507,12 @@ struct SigningDetailView: View {
                 if current.tripFee > 0 {
                     LabeledRow("└ 跑趟费", "$" + String(format: "%.0f", current.tripFee))
                 }
-                LabeledRow("里程", String(format: "%.1f", current.mileage) + " mi")
-                LabeledRow("状态", ["已约", "完成", "没来"][statusIndex])
+                                LabeledRow("状态", ["已约", "完成", "没来"][statusIndex])
                 LabeledRow("收款", current.paid ? "已收" : "未收")
                 // A1 账龄
                 if current.agingLevel > 0 {
                     LabeledRow("逾期", "\(current.unpaidDays) 天未收")
                 }
-            }
-            // A5 时薪判决（A3 净利）
-            Section("这单值不值") {
-                HStack {
-                    Text("净利/小时")
-                    Spacer()
-                    Text("$" + String(format: "%.0f", current.hourlyNet) + "/h")
-                        .foregroundColor(verdictColor)
-                }
-                HStack {
-                    Text("门到门")
-                    Spacer()
-                    Text("\(current.doorToDoorMinutes) 分钟")
-                        .foregroundColor(.secondary)
-                }
-                HStack {
-                    Text("判决")
-                    Spacer()
-                    Text(verdictText)
-                        .foregroundColor(verdictColor)
-                }
-                Text(verdictReason)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
             }
             Section("公证行为计数") {
                 LabeledRow("借款合同", "\(current.borrowDocs) 份")
@@ -588,39 +566,7 @@ struct SigningDetailView: View {
     }
 
     // A5 时薪判决（对照 settings.hourlyFloor）
-    private var verdictColor: Color {
-        let floor = data.settings.hourlyFloor
-        if current.hourlyNet >= floor { return .green }
-        if current.hourlyNet >= floor * 0.8 { return .yellow }
-        return .red
-    }
-    private var verdictText: String {
-        let floor = data.settings.hourlyFloor
-        if current.hourlyNet >= floor { return "✅ 值得接" }
-        if current.hourlyNet >= floor * 0.8 { return "⚠️ 勉强" }
-        return "🔴 低于地板"
-    }
 
-    /// 健哥令③：判决理由（为什么值/不值）
-    private var verdictReason: String {
-        let floor = data.settings.hourlyFloor
-        let net = current.netProfit
-        let hours = Double(current.doorToDoorMinutes) / 60.0
-        var reasons: [String] = []
-        reasons.append("费用 $" + String(format: "%.0f", current.fee))
-        reasons.append("里程 " + String(format: "%.0f", current.mileage) + " mi（-$" + String(format: "%.0f", current.mileage * data.settings.mileageRate) + "）")
-        reasons.append("耗材 -$" + String(format: "%.0f", data.settings.supplyCostPerSigning))
-        reasons.append("净利 $" + String(format: "%.0f", net))
-        reasons.append("门到门 " + String(current.doorToDoorMinutes) + " 分钟 → 时薪 $" + String(format: "%.0f", current.hourlyNet))
-        let base = "对照地板 $" + String(format: "%.0f", floor) + "/小时："
-        if current.hourlyNet >= floor {
-            return base + "时薪达标，" + reasons.joined(separator: " · ")
-        }
-        if current.hourlyNet >= floor * 0.8 {
-            return base + "差 " + String(format: "%.0f", floor - current.hourlyNet) + "/小时到地板。" + reasons.joined(separator: " · ")
-        }
-        return base + "低于地板 " + String(format: "%.0f", floor - current.hourlyNet) + "/小时，建议下次报价 ≥ $" + String(format: "%.0f", floor * hours + current.mileage * data.settings.mileageRate + data.settings.supplyCostPerSigning) + "。"
-    }
 }
 
 struct LabeledRow: View {
@@ -916,7 +862,6 @@ enum NTExporter {
         l.append("类型：\(s.serviceType.rawValue)")
         l.append("总费用：$" + String(format: "%.0f", s.fee) + "（公证费免税 $" + String(format: "%.0f", s.notaryFeePortion) + " + 服务费应税 $" + String(format: "%.0f", s.taxablePortion) + "）")
         if s.tripFee > 0 { l.append("跑趟费：$" + String(format: "%.0f", s.tripFee)) }
-        l.append("里程：" + String(format: "%.1f", s.mileage) + " mi（抵税 $" + String(format: "%.0f", s.mileage * settings.mileageRate) + "）")
         l.append("耗材：$" + String(format: "%.2f", settings.supplyCostPerSigning))
         l.append("净利：$" + String(format: "%.2f", s.netProfit) + " / 时薪 $" + String(format: "%.0f", s.hourlyNet))
         l.append("状态：\(s.status == .done ? "完成" : s.status == .noshow ? "没成功" : "已约") · \(s.paid ? "已收" : "未收")")
@@ -935,13 +880,11 @@ enum NTExporter {
         l.append(String(repeating: "=", count: 30))
         let income = done.reduce(0) { $0 + $1.fee }
         let notary = done.reduce(0) { $0 + $1.notaryFeePortion }
-        let miles = done.reduce(0) { $0 + $1.mileage }
         let net = done.reduce(0) { $0 + $1.netProfit }
         l.append("单数：\(done.count)")
         l.append("总收入：$" + String(format: "%.0f", income) )
         l.append("  其中公证费（SE 免税）：$" + String(format: "%.0f", notary) )
         l.append("  其中服务费（应税）：$" + String(format: "%.0f", income - notary) )
-        l.append("总里程：" + String(format: "%.0f", miles) + " mi（抵税 $" + String(format: "%.0f", miles * data.settings.mileageRate) + "）")
         l.append("总净利：$" + String(format: "%.0f", net) )
         let unpaid = data.signings.filter { $0.status == .done && !$0.paid }
         if !unpaid.isEmpty {
@@ -953,7 +896,7 @@ enum NTExporter {
         l.append("——逐单明细——")
         for s in done.sorted(by: { $0.date < $1.date }) {
             let cn = data.clients.first { $0.id == s.clientId }?.company ?? "?"
-            l.append(df.string(from: s.date) + " " + cn + " $" + String(format: "%.0f", s.fee) + " " + String(format: "%.0f", s.mileage) + "mi " + (s.paid ? "已收" : "未收"))
+            l.append(df.string(from: s.date) + " " + cn + " $" + String(format: "%.0f", s.fee) + " " + (s.paid ? "已收" : "未收"))
         }
         return l.joined(separator: "\n")
     }

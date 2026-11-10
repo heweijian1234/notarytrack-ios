@@ -14,7 +14,6 @@ struct SigningEditor: View {
     @State private var fee = 0.0              // 健哥令①：不预填
     @State private var notaryFeePortion = 0.0
     @State private var tripFee = 0.0
-    @State private var mileage = 0.0
     @State private var minutes = 60
     @State private var buffer = 15
     @State private var serviceType: ServiceType = .loan
@@ -112,12 +111,6 @@ struct SigningEditor: View {
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                     }
-                    HStack {
-                        Text("往返里程 mi")
-                        TextField("0", value: $mileage, format: .number)
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
-                    }
                     // 健哥令②：耗材成本自填
                     HStack {
                         Text("耗材成本 $（打印/纸/墨）")
@@ -125,7 +118,7 @@ struct SigningEditor: View {
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                     }
-                    Text("公证费部分免自雇税（IRS §1402）· 里程抵税 $\(String(format: "%.0f", mileage * 0.67)) · 净利已含耗材")
+                    Text("公证费部分免自雇税（IRS §1402）· 净利已含耗材成本")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -163,7 +156,7 @@ struct SigningEditor: View {
         guard let cid = clientId else { return }
         data.signings.append(Signing(clientId: cid, date: date, address: address, fee: fee,
                                      notaryFeePortion: notaryFeePortion, tripFee: tripFee,
-                                     mileage: mileage, minutes: minutes, driveBufferMinutes: buffer,
+                                     minutes: minutes, driveBufferMinutes: buffer,
                                      serviceType: serviceType, borrowDocs: borrowDocs,
                                      trustDocs: trustDocs, otherDocs: otherDocs, note: note))
         data.settings.supplyCostPerSigning = supplyCost   // 记住耗材单价
