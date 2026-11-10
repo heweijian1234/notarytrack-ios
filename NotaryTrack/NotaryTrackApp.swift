@@ -263,6 +263,7 @@ struct SigningRowMetrics: View {
     var body: some View {
         HStack(spacing: 8) {
             Text("$" + String(format: "%.0f", s.fee))
+            Text("· 净利 $" + String(format: "%.0f", s.netProfit(supplyCost: 2.50)))
             if s.tripFee > 0 {
                 Text("· 跑趟费 $" + String(format: "%.0f", s.tripFee))
             }
@@ -329,11 +330,12 @@ struct SigningListView: View {
 
     /// 本月小结 v3（健哥令：删里程删净利；保留账龄/免税拆分/跑趟费）
     var monthSummary: (count: Int, income: Double, notaryPortion: Double, taxablePortion: Double,
-                       tripFees: Double, acts: Int, unpaid: Int,
+                       tripFees: Double, acts: Int, netProfit: Double, unpaid: Int,
                        overdueAmount: Double, overdueCount: Int) {
         let cal = Calendar.current
         let done = data.signings.filter { $0.status == .done && cal.isDate($0.date, equalTo: Date(), toGranularity: .month) }
         let overdue = data.signings.filter { $0.agingLevel > 0 }
+        let supply = data.settings.supplyCostPerSigning
         return (
             done.count,
             done.reduce(0) { $0 + $1.fee },
@@ -341,6 +343,7 @@ struct SigningListView: View {
             done.reduce(0) { $0 + $1.taxablePortion },
             done.reduce(0) { $0 + $1.tripFee },
             done.reduce(0) { $0 + $1.borrowDocs + $1.trustDocs + $1.otherDocs },
+            done.reduce(0.0) { $0 + $1.netProfit(supplyCost: supply) },
             data.signings.filter { $0.status == .done && !$0.paid }.count,
             overdue.reduce(0) { $0 + $1.fee },
             overdue.count
@@ -348,13 +351,16 @@ struct SigningListView: View {
     }
 
     /// 健哥令②：年度累计（今年至今——报税直用）
-    var yearSummary: (count: Int, notaryPortion: Double, taxablePortion: Double) {
+    var yearSummary: (count: Int, income: Double, notaryPortion: Double, taxablePortion: Double, netProfit: Double) {
         let cal = Calendar.current
         let done = data.signings.filter { $0.status == .done && cal.isDate($0.date, equalTo: Date(), toGranularity: .year) }
+        let supply = data.settings.supplyCostPerSigning
         return (
             done.count,
+            done.reduce(0) { $0 + $1.fee },
             done.reduce(0) { $0 + $1.notaryFeePortion },
-            done.reduce(0) { $0 + $1.taxablePortion }
+            done.reduce(0) { $0 + $1.taxablePortion },
+            done.reduce(0.0) { $0 + $1.netProfit(supplyCost: supply) }
         )
     }
 
@@ -396,8 +402,8 @@ struct SigningListView: View {
                             HStack {
                                 StatCell("单数", "\(monthSummary.count)")
                                 StatCell("收入", "$" + String(format: "%.0f", monthSummary.income))
+                                StatCell("净利", "$" + String(format: "%.0f", monthSummary.netProfit))
                                 StatCell("跑趟费", "$" + String(format: "%.0f", monthSummary.tripFees))
-                                StatCell("公证行为", "\(monthSummary.acts)")
                             }
                             // A4 SE 免税拆分 + 税预估
                             HStack(spacing: 16) {
@@ -419,9 +425,14 @@ struct SigningListView: View {
                         Section("年度累计（今年至今）") {
                             HStack {
                                 StatCell("单数", "\(yearSummary.count)")
-                                StatCell("公证费(免税)", "$" + String(format: "%.0f", yearSummary.notaryPortion))
-                                StatCell("服务费(应税)", "$" + String(format: "%.0f", yearSummary.taxablePortion))
+                                StatCell("净利", "$" + String(format: "%.0f", yearSummary.netProfit))
                             }
+                            HStack(spacing: 16) {
+                                Label("公证费(免税) $" + String(format: "%.0f", yearSummary.notaryPortion), systemImage: "checkmark.shield")
+                                    .foregroundColor(.green)
+                                Label("服务费 $" + String(format: "%.0f", yearSummary.taxablePortion), systemImage: "doc.text")
+                            }
+                            .font(.caption)
                         }
                         Section("全部签署单") {
                             ForEach(sortedDesc) { s in
@@ -507,6 +518,7 @@ struct SigningDetailView: View {
                 if current.tripFee > 0 {
                     LabeledRow("└ 跑趟费", "$" + String(format: "%.0f", current.tripFee))
                 }
+                LabeledRow("净利(扣耗材)", "$" + String(format: "%.2f", current.netProfit(supplyCost: data.settings.supplyCostPerSigning)))
                                 LabeledRow("状态", ["已约", "完成", "没来"][statusIndex])
                 LabeledRow("收款", current.paid ? "已收" : "未收")
                 // A1 账龄
