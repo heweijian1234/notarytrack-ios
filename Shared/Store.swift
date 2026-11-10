@@ -21,6 +21,7 @@ enum ServiceType: String, Codable, CaseIterable {
         case .general: return "General Notary"
         case .apostille: return "Apostille"
         case .hospital: return "Hospital/Facility"
+        case .estate: return "Estate Planning"
         case .other: return "Other"
         }
     }
