@@ -12,7 +12,7 @@ enum ServiceType: String, Codable, CaseIterable {
     case other = "其他"
 
     var emoji: String {
-        switch self { case .loan: return "🏠"; case .general: return "📝"; case .apostille: return "🌐"; case .hospital: return "🏥"; case .other: return "🐾" }
+        switch self { case .loan: return "🏠"; case .general: return "📝"; case .apostille: return "🌐"; case .hospital: return "🏥"; case .estate: return "📜"; case .other: return "🐾" }
     }
 
     var display: String {
