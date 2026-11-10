@@ -82,7 +82,7 @@ struct TodayView: View {
                             .foregroundColor(.indigo)
                         Text("你的签署代理台账")
                             .font(.headline)
-                        Text(L("Add clients (title companies) first, then log signings. Fees, trip fees, notarial acts — nothing missed.", "先加客户（标题公司），再录签署单。费用、跑趟费、公证行为数，一单不漏。"))
+                        Text("先加客户（标题公司），再录签署单。费用、跑趟费、公证行为数，一单不漏。")
                             .font(.footnote)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
@@ -863,7 +863,7 @@ enum NTExporter {
         l.append("总费用：$" + String(format: "%.0f", s.fee) + "（公证费免税 $" + String(format: "%.0f", s.notaryFeePortion) + " + 服务费应税 $" + String(format: "%.0f", s.taxablePortion) + "）")
         if s.tripFee > 0 { l.append("跑趟费：$" + String(format: "%.0f", s.tripFee)) }
         l.append("耗材：$" + String(format: "%.2f", settings.supplyCostPerSigning))
-        l.append("净利：$" + String(format: "%.2f", s.netProfit) + " / 时薪 $" + String(format: "%.0f", s.hourlyNet))
+        l.append("净利：$" + String(format: "%.2f", s.netProfit(supplyCost: settings.supplyCostPerSigning)))
         l.append("状态：\(s.status == .done ? "完成" : s.status == .noshow ? "没成功" : "已约") · \(s.paid ? "已收" : "未收")")
         l.append("公证行为：借款 \(s.borrowDocs) / 信托 \(s.trustDocs) / 其他 \(s.otherDocs)")
         if !s.note.isEmpty { l.append("备注：\(s.note)") }
