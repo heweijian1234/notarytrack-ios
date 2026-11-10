@@ -880,7 +880,7 @@ enum NTExporter {
         l.append(String(repeating: "=", count: 30))
         let income = done.reduce(0) { $0 + $1.fee }
         let notary = done.reduce(0) { $0 + $1.notaryFeePortion }
-        let net = done.reduce(0) { $0 + $1.netProfit }
+        let net = done.reduce(0.0) { $0 + $1.netProfit(supplyCost: data.settings.supplyCostPerSigning) }
         l.append("单数：\(done.count)")
         l.append("总收入：$" + String(format: "%.0f", income) )
         l.append("  其中公证费（SE 免税）：$" + String(format: "%.0f", notary) )
