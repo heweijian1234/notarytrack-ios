@@ -71,7 +71,7 @@ struct Signing: Codable, Identifiable, Equatable {
 
     enum Status: String, Codable { case scheduled, done, noshow
         var display: String {
-            switch self { case .scheduled: return "Scheduled"; case .done: return "Done"; case .noshow: return "No-show" }
+            switch self { case .scheduled: return "Scheduled"; case .done: return "Done"; case .noshow: return "No-show"; case .canceled: return "Canceled" }
         }
     }
 
