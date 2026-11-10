@@ -766,7 +766,7 @@ struct FeedbackView: View {
                         .overlay(
                             Group {
                                 if feedbackText.isEmpty {
-                                    Text("用着哪里不顺？缺什么功能？直接写。")
+                                    Text("哪里出现了错误？用着哪里不顺？缺什么功能？直接写。")
                                         .foregroundColor(.secondary)
                                         .font(.footnote)
                                         .padding(.top, 8)
