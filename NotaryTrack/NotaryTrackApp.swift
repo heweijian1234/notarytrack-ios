@@ -778,7 +778,7 @@ struct FeedbackView: View {
                 }
                 Section {
                     Button {
-                        let subject = "公证签署台账-用户反馈"
+                        let subject = "NotaryTrack - user feedback"
                         let body = feedbackText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
                         if let url = URL(string: "mailto:zeronelabs.dev@gmail.com?subject=\(subject)&body=\(body)") {
                             UIApplication.shared.open(url)

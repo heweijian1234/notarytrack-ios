@@ -21,7 +21,7 @@ targets:
     info:
       path: NotaryTrack/Info.plist
       properties:
-        CFBundleDisplayName: 公证签署台账
+        CFBundleDisplayName: NotaryTrack
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         UILaunchScreen:
