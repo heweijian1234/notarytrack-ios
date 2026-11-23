@@ -65,6 +65,7 @@ jobs:
           set -o pipefail
           # archive 阶段不签名（CI 经典分法）：签名全部移到 export 步（ExportOptions method=app-store-connect 向云端要证书）
           # 此法绕开 xcodegen 工程签名设置与命令行参数的冲突（automatically signed for development vs Apple Distribution）
+          # 11-24诊断改造（G仓同款搬运）：全量日志落盘，失败时error行打::error::批注（匿名API可读）
           xcodebuild archive \
             -project NotaryTrack.xcodeproj \
             -scheme NotaryTrack \
@@ -75,7 +76,14 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             DEVELOPMENT_TEAM="$DEV_TEAM_ID" \
             CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
-            2>&1 | tail -50
+            > "$RUNNER_TEMP/archive.log" 2>&1 || {
+              grep -E "error:|fatal error|error generated" "$RUNNER_TEMP/archive.log" | head -25 | while IFS= read -r line; do
+                echo "::error::$line"
+              done
+              tail -50 "$RUNNER_TEMP/archive.log"
+              exit 1
+            }
+          tail -20 "$RUNNER_TEMP/archive.log"
 
       - name: Export IPA
         env:

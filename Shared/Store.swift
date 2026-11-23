@@ -17,12 +17,12 @@ enum ServiceType: String, Codable, CaseIterable {
 
     var display: String {
         switch self {
-        case .loan: return "Loan Signing"
-        case .general: return "General Notary"
-        case .apostille: return "Apostille"
-        case .hospital: return "Hospital/Facility"
-        case .estate: return "Estate Planning"
-        case .other: return "Other"
+        case .loan: return L("Loan Signing", "贷款签署")
+        case .general: return L("General Notary", "普通公证")
+        case .apostille: return L("Apostille", "海牙认证")
+        case .hospital: return L("Hospital/Facility", "医院/机构")
+        case .estate: return L("Estate Planning", "遗产规划")
+        case .other: return L("Other", "其他")
         }
     }
 }
@@ -59,7 +59,7 @@ struct Signing: Codable, Identifiable, Equatable {
     var notaryFeePortion: Double // A4：其中公证行为费（SE 免税部分，州定价×签数）
     var tripFee: Double         // A7：跑趟费（no-show/redraw/等待超时场景单列）
     var minutes: Int            // 桌上耗时（分钟）
-    var driveBufferMinutes: Int // A5 分母补全：车程缓冲（分钟）
+    var driveBufferMinutes: Int // 车程缓冲（分钟）
     var serviceType: ServiceType // A8：服务类型
     var borrowDocs: Int         // 借款合同份数（N6）
     var trustDocs: Int          // 信托文件份数（N6）
@@ -72,7 +72,7 @@ struct Signing: Codable, Identifiable, Equatable {
 
     enum Status: String, Codable { case scheduled, done, noshow
         var display: String {
-            switch self { case .scheduled: return "Scheduled"; case .done: return "Done"; case .noshow: return "No-show" }
+            switch self { case .scheduled: return L("Scheduled", "已约"); case .done: return L("Done", "完成"); case .noshow: return L("No-show", "没来") }
         }
     }
 
@@ -124,22 +124,13 @@ struct Signing: Codable, Identifiable, Equatable {
     /// A4 服务费（应税部分）= 总费 - 公证费免税部分
     var taxablePortion: Double { fee - notaryFeePortion }
 
-    /// A3 净利 = 总费用 + 跑趟费 - 耗材（v1.4 健哥令：里程取消，耗材单价外部传入）
-    func netProfit(supplyCost: Double) -> Double {
-        fee + tripFee - supplyCost
-    }
 
 
 }
 
-// MARK: - 设置（A5 时薪地板 + A3 耗材单价，全局）
+// MARK: - 设置（预留：A3耗材/A5时薪已砍11-24；后续Pro设置用）
 
 struct AppSettings: Codable, Equatable {
-    var supplyCostPerSigning: Double  // A3：单均耗材成本（默认 $2.50）
-
-    init(supplyCostPerSigning: Double = 2.50) {
-        self.supplyCostPerSigning = supplyCostPerSigning
-    }
 }
 
 // MARK: - 委托证（N5：到期提醒，存全局设置）

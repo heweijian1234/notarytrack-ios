@@ -18,16 +18,16 @@ struct RootView: View {
     var body: some View {
         TabView(selection: $tab) {
             TodayView(data: $data)
-                .tabItem { Label("Today", systemImage: "calendar") }
+                .tabItem { Label(L("Today", "今日"), systemImage: "calendar") }
                 .tag(0)
             SigningListView(data: $data)
-                .tabItem { Label("Signings", systemImage: "doc.text") }
+                .tabItem { Label(L("Signings", "签署单"), systemImage: "doc.text") }
                 .tag(1)
             ClientListView(data: $data)
-                .tabItem { Label("Clients", systemImage: "person.2") }
+                .tabItem { Label(L("Clients", "客户"), systemImage: "person.2") }
                 .tag(2)
             FeedbackView()
-                .tabItem { Label("Me", systemImage: "person.crop.circle") }
+                .tabItem { Label(L("Me", "我的"), systemImage: "person.crop.circle") }
                 .tag(3)
         }
         .onAppear { data = Store.load() }
@@ -44,8 +44,8 @@ struct TodayView: View {
     var commissionWarn: String? {
         guard let c = data.commission else { return nil }
         let days = c.daysUntilExpiry
-        if days < 0 { return "委托证已过期 \(-days) 天——不能接单，快续！" }
-        if days <= 90 { return "委托证 \(days) 天后到期（\(c.state)）——开始续证流程" }
+        if days < 0 { return L("Commission expired \(-days) days ago — no signings allowed. Renew now!", "委托证已过期 \(-days) 天——不能接单，快续！") }
+        if days <= 90 { return L("Commission expires in \(days) days (\(c.state)) — start renewal", "委托证 \(days) 天后到期（\(c.state)）——开始续证流程") }
         return nil
     }
 
@@ -80,9 +80,9 @@ struct TodayView: View {
                         Image(systemName: "stamp")
                             .font(.system(size: 52))
                             .foregroundColor(.indigo)
-                        Text("Your signing agent book")
+                        Text(L("Your signing agent book", "你的公证签署台账"))
                             .font(.headline)
-                        Text("Add a client (title company) first, then log signings. Fees, trip fees, notarial acts — nothing missed.")
+                        Text(L("Add a client (title company) first, then log signings. Fees, trip fees, notarial acts — nothing missed.", "先加客户（标题公司），再记签署单。费用、跑趟费、公证行为——一样不漏。"))
                             .font(.footnote)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
@@ -99,12 +99,12 @@ struct TodayView: View {
                         }
                         // A9 该回访了
                         if !dueFollowUps.isEmpty {
-                            Section("Due for follow-up") {
+                            Section(L("Due for follow-up", "该回访了")) {
                                 ForEach(dueFollowUps, id: \.0.id) { client, days, threshold in
                                     HStack {
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(client.company).font(.headline)
-                                            Text("\(days) days since last signing (\(threshold == 30 ? "business" : "individual") · \(threshold)-day norm)")
+                                            Text(L("\(days) days since last signing (\(threshold == 30 ? "business" : "individual") · \(threshold)-day norm)", "\(days) 天没新单（\(threshold == 30 ? "企业" : "个人") · \(threshold)天标准）"))
                                                 .font(.caption)
                                                 .foregroundColor(.secondary)
                                         }
@@ -130,19 +130,19 @@ struct TodayView: View {
                             }
                         }
                         if data.signings.isEmpty {
-                            Text("No signings yet — tap + to add.")
+                            Text(L("No signings yet — tap + to add.", "还没有签署单——点右上角 + 添加。"))
                                 .font(.footnote)
                                 .foregroundColor(.secondary)
                         }
                     }
                 }
             }
-            .navigationTitle("Today")
+            .navigationTitle(L("Today", "今日"))
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
-                        Button { showAdd = true } label: { Label("New Signing", systemImage: "plus") }
-                        Button { showCommission = true } label: { Label("Commission", systemImage: "credentialing") }
+                        Button { showAdd = true } label: { Label(L("New Signing", "新签署单"), systemImage: "plus") }
+                        Button { showCommission = true } label: { Label(L("Commission", "委托证"), systemImage: "credentialing") }
                     } label: { Image(systemName: "ellipsis.circle") }
                 }
             }
@@ -157,8 +157,13 @@ struct TodayView: View {
 
     private var groupedByDay: [(String, [Signing])] {
         let df = DateFormatter()
-        df.dateFormat = "M月d日 EEEE"
-        df.locale = Locale(identifier: "zh_CN")
+        if AppLang.current == .en {
+            df.dateFormat = "MMM d EEEE"
+            df.locale = Locale(identifier: "en_US")
+        } else {
+            df.dateFormat = "M月d日 EEEE"
+            df.locale = Locale(identifier: "zh_CN")
+        }
         let groups = Dictionary(grouping: data.signings.filter { $0.status == .scheduled }.sorted { $0.date < $1.date }) {
             df.string(from: $0.date)
         }
@@ -178,14 +183,14 @@ struct SigningRow: View {
     var tf: DateFormatter {
         let f = DateFormatter()
         f.timeStyle = .short
-        f.locale = Locale(identifier: "zh_CN")
+        f.locale = Locale(identifier: AppLang.current == .en ? "en_US" : "zh_CN")
         return f
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text(client?.company ?? "Unknown client")
+                Text(client?.company ?? L("Unknown client", "未知客户"))
                     .font(.headline)
                 Spacer()
                 Text(tf.string(from: signing.date))
@@ -194,12 +199,12 @@ struct SigningRow: View {
             }
             HStack(spacing: 10) {
                 Label("$\(signing.fee, specifier: "%.0f")", systemImage: "dollarsign.circle")
-                Label("Trip fee $" + String(format: "%.0f", signing.tripFee), systemImage: "car")
+                Label(L("Trip fee $", "跑趟费 $") + String(format: "%.0f", signing.tripFee), systemImage: "car")
                 if signing.paid {
-                    Label("Paid", systemImage: "checkmark.seal")
+                    Label(L("Paid", "已收"), systemImage: "checkmark.seal")
                         .foregroundColor(.green)
                 } else {
-                    Label("Unpaid", systemImage: "hourglass")
+                    Label(L("Unpaid", "未收"), systemImage: "hourglass")
                         .foregroundColor(.orange)
                 }
             }
@@ -210,7 +215,7 @@ struct SigningRow: View {
                 Button {
                     update(.done)
                 } label: {
-                    Label("Done", systemImage: "checkmark.circle.fill")
+                    Label(L("Done", "完成"), systemImage: "checkmark.circle.fill")
                         .font(.caption)
                 }
                 .buttonStyle(.bordered)
@@ -218,7 +223,7 @@ struct SigningRow: View {
                 Button {
                     update(.noshow)
                 } label: {
-                    Label("No-show", systemImage: "xmark.circle")
+                    Label(L("No-show", "没来"), systemImage: "xmark.circle")
                         .font(.caption)
                 }
                 .buttonStyle(.bordered)
@@ -227,7 +232,7 @@ struct SigningRow: View {
                     Button {
                         markPaid()
                     } label: {
-                        Label("Mark Paid", systemImage: "dollarsign.arrow.circlepath")
+                        Label(L("Mark Paid", "标记已收"), systemImage: "dollarsign.arrow.circlepath")
                             .font(.caption)
                     }
                     .buttonStyle(.borderedProminent)
@@ -263,11 +268,10 @@ struct SigningRowMetrics: View {
     var body: some View {
         HStack(spacing: 8) {
             Text("$" + String(format: "%.0f", s.fee))
-            Text("· Net $" + String(format: "%.0f", s.netProfit(supplyCost: 2.50)))
             if s.tripFee > 0 {
-                Text("· Trip fee $" + String(format: "%.0f", s.tripFee))
+                Text(L("· Trip fee $", "· 跑趟费 $") + String(format: "%.0f", s.tripFee))
             }
-            Text("· " + (s.paid ? "已收" : "未收"))
+            Text("· " + (s.paid ? L("Paid", "已收") : L("Unpaid", "未收")))
         }
         .font(.caption)
         .foregroundColor(.secondary)
@@ -286,10 +290,10 @@ struct SigningRowHeader: View {
                 .font(.headline)
             Text(s.serviceType.emoji).font(.caption)
             if s.status == .noshow {
-                Text("No-show").font(.caption2).foregroundColor(.red)
+                Text(L("No-show", "没来")).font(.caption2).foregroundColor(.red)
             }
             if s.agingLevel > 0 {
-                Text("Overdue \(s.unpaidDays)d")
+                Text(L("Overdue \(s.unpaidDays)d", "逾期\(s.unpaidDays)天"))
                     .font(.caption2)
                     .foregroundColor(s.agingLevel == 2 ? .red : .orange)
             }
@@ -307,7 +311,7 @@ struct SigningListRow: View {
     let sortedDesc: [Signing]
 
     private var clientName: String {
-        data.clients.first { $0.id == s.clientId }?.company ?? "未知"
+        data.clients.first { $0.id == s.clientId }?.company ?? L("Unknown", "未知")
     }
 
     var body: some View {
@@ -330,12 +334,11 @@ struct SigningListView: View {
 
     /// 本月小结 v3（健哥令：删里程删净利；保留账龄/免税拆分/跑趟费）
     var monthSummary: (count: Int, income: Double, notaryPortion: Double, taxablePortion: Double,
-                       tripFees: Double, acts: Int, netProfit: Double, unpaid: Int,
+                       tripFees: Double, acts: Int, unpaid: Int,
                        overdueAmount: Double, overdueCount: Int) {
         let cal = Calendar.current
         let done = data.signings.filter { $0.status == .done && cal.isDate($0.date, equalTo: Date(), toGranularity: .month) }
         let overdue = data.signings.filter { $0.agingLevel > 0 }
-        let supply = data.settings.supplyCostPerSigning
         return (
             done.count,
             done.reduce(0) { $0 + $1.fee },
@@ -343,7 +346,6 @@ struct SigningListView: View {
             done.reduce(0) { $0 + $1.taxablePortion },
             done.reduce(0) { $0 + $1.tripFee },
             done.reduce(0) { $0 + $1.borrowDocs + $1.trustDocs + $1.otherDocs },
-            done.reduce(0.0) { $0 + $1.netProfit(supplyCost: supply) },
             data.signings.filter { $0.status == .done && !$0.paid }.count,
             overdue.reduce(0) { $0 + $1.fee },
             overdue.count
@@ -351,16 +353,14 @@ struct SigningListView: View {
     }
 
     /// 健哥令②：年度累计（今年至今——报税直用）
-    var yearSummary: (count: Int, income: Double, notaryPortion: Double, taxablePortion: Double, netProfit: Double) {
+    var yearSummary: (count: Int, income: Double, notaryPortion: Double, taxablePortion: Double) {
         let cal = Calendar.current
         let done = data.signings.filter { $0.status == .done && cal.isDate($0.date, equalTo: Date(), toGranularity: .year) }
-        let supply = data.settings.supplyCostPerSigning
         return (
             done.count,
             done.reduce(0) { $0 + $1.fee },
             done.reduce(0) { $0 + $1.notaryFeePortion },
-            done.reduce(0) { $0 + $1.taxablePortion },
-            done.reduce(0.0) { $0 + $1.netProfit(supplyCost: supply) }
+            done.reduce(0) { $0 + $1.taxablePortion }
         )
     }
 
@@ -378,9 +378,9 @@ struct SigningListView: View {
                         Image(systemName: "doc.text")
                             .font(.system(size: 52))
                             .foregroundColor(.indigo)
-                        Text("No signings yet")
+                        Text(L("No signings yet", "还没有签署单"))
                             .font(.headline)
-                        Text("Log your first signing: client, fee, mileage, notarial acts.")
+                        Text(L("Log your first signing: client, fee, notarial acts.", "记第一单：客户、费用、公证行为。"))
                             .font(.footnote)
                             .foregroundColor(.secondary)
                         Spacer()
@@ -391,50 +391,49 @@ struct SigningListView: View {
                         if monthSummary.overdueCount > 0 {
                             Section {
                                 NavigationLink(destination: OverdueListView(overdue: overdueSignings, data: $data)) {
-                                    Label("\(monthSummary.overdueCount) overdue, totaling $\(monthSummary.overdueAmount, specifier: "%.0f") (30+ days)",
+                                    Label(L("\(monthSummary.overdueCount) overdue, totaling $\(monthSummary.overdueAmount, specifier: "%.0f") (30+ days)", "\(monthSummary.overdueCount) 单逾期，合计 $\(monthSummary.overdueAmount, specifier: "%.0f")（超30天）"),
                                           systemImage: "clock.badge.exclamationmark.fill")
                                         .font(.footnote)
                                         .foregroundColor(.red)
                                 }
                             }
                         }
-                        Section("This Month") {
+                        Section(L("This Month", "本月")) {
                             HStack {
-                                StatCell("Signings", "\(monthSummary.count)")
-                                StatCell("Income", "$" + String(format: "%.0f", monthSummary.income))
-                                StatCell("Net", "$" + String(format: "%.0f", monthSummary.netProfit))
-                                StatCell("Trip fees", "$" + String(format: "%.0f", monthSummary.tripFees))
+                                StatCell(L("Signings", "单数"), "\(monthSummary.count)")
+                                StatCell(L("Income", "收入"), "$" + String(format: "%.0f", monthSummary.income))
+                                StatCell(L("Trip fees", "跑趟费"), "$" + String(format: "%.0f", monthSummary.tripFees))
                             }
                             // A4 SE 免税拆分 + 税预估
                             HStack(spacing: 16) {
-                                Label("Notary (SE-exempt) $" + String(format: "%.0f", monthSummary.notaryPortion), systemImage: "checkmark.shield")
+                                Label(L("Notary (SE-exempt) $", "公证费（免SE税）$") + String(format: "%.0f", monthSummary.notaryPortion), systemImage: "checkmark.shield")
                                     .foregroundColor(.green)
-                                Label("Service $" + String(format: "%.0f", monthSummary.taxablePortion), systemImage: "doc.text")
+                                Label(L("Service $", "服务费 $") + String(format: "%.0f", monthSummary.taxablePortion), systemImage: "doc.text")
                             }
                             .font(.caption)
-                            Label("Est. SE tax $" + String(format: "%.0f", monthSummary.taxablePortion * 0.153) + "（应税部分×15.3%）", systemImage: "percent")
+                            Label(L("Est. SE tax $", "预估SE税 $") + String(format: "%.0f", monthSummary.taxablePortion * 0.153) + L(" (taxable × 15.3%)", "（应税部分×15.3%）"), systemImage: "percent")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             if monthSummary.unpaid > 0 {
-                                Label("\(monthSummary.unpaid) signings unpaid", systemImage: "exclamationmark.circle")
+                                Label(L("\(monthSummary.unpaid) signings unpaid", "\(monthSummary.unpaid) 单未收款"), systemImage: "exclamationmark.circle")
                                     .font(.footnote)
                                     .foregroundColor(.orange)
                             }
                         }
                         // 健哥令②：年度累计
-                        Section("Year to Date") {
+                        Section(L("Year to Date", "今年累计")) {
                             HStack {
-                                StatCell("Signings", "\(yearSummary.count)")
-                                StatCell("Net", "$" + String(format: "%.0f", yearSummary.netProfit))
+                                StatCell(L("Signings", "单数"), "\(yearSummary.count)")
+                                StatCell(L("Income", "收入"), "$" + String(format: "%.0f", yearSummary.income))
                             }
                             HStack(spacing: 16) {
-                                Label("Notary (SE-exempt) $" + String(format: "%.0f", yearSummary.notaryPortion), systemImage: "checkmark.shield")
+                                Label(L("Notary (SE-exempt) $", "公证费（免SE税）$") + String(format: "%.0f", yearSummary.notaryPortion), systemImage: "checkmark.shield")
                                     .foregroundColor(.green)
-                                Label("Service $" + String(format: "%.0f", yearSummary.taxablePortion), systemImage: "doc.text")
+                                Label(L("Service $", "服务费 $") + String(format: "%.0f", yearSummary.taxablePortion), systemImage: "doc.text")
                             }
                             .font(.caption)
                         }
-                        Section("All Signings") {
+                        Section(L("All Signings", "全部签署单")) {
                             ForEach(sortedDesc) { s in
                                 SigningListRow(s: s, data: $data, sortedDesc: sortedDesc)
                             }
@@ -450,7 +449,7 @@ struct SigningListView: View {
                     }
                 }
             }
-            .navigationTitle("Signings")
+            .navigationTitle(L("Signings", "签署单"))
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button { showAdd = true } label: { Image(systemName: "plus") }
@@ -495,7 +494,7 @@ struct SigningDetailView: View {
 
     var body: some View {
         List {
-            Section("Clients") {
+            Section(L("Clients", "客户")) {
                 if let client {
                     NavigationLink(destination: ClientDetailView(client: client, data: $data)) {
                         VStack(alignment: .leading) {
@@ -507,54 +506,53 @@ struct SigningDetailView: View {
                     }
                 }
             }
-            Section("This Signing") {
-                LabeledRow("Date", current.date.formatted(date: .long, time: .shortened))
-                if !current.address.isEmpty { LabeledRow("Location", current.address) }
-                LabeledRow("Type", current.serviceType.display)
-                LabeledRow("Total fee", "$" + String(format: "%.0f", current.fee))
+            Section(L("This Signing", "本单")) {
+                LabeledRow(L("Date", "日期"), current.date.formatted(date: .long, time: .shortened))
+                if !current.address.isEmpty { LabeledRow(L("Location", "地点"), current.address) }
+                LabeledRow(L("Type", "类型"), current.serviceType.display)
+                LabeledRow(L("Total fee", "总费用"), "$" + String(format: "%.0f", current.fee))
                 // A4 拆分显示
-                LabeledRow("├ Notary (exempt)", "$" + String(format: "%.0f", current.notaryFeePortion))
-                LabeledRow("├ Service (taxable)", "$" + String(format: "%.0f", current.taxablePortion))
+                LabeledRow(L("├ Notary (exempt)", "├ 公证费（免税）"), "$" + String(format: "%.0f", current.notaryFeePortion))
+                LabeledRow(L("├ Service (taxable)", "├ 服务费（应税）"), "$" + String(format: "%.0f", current.taxablePortion))
                 if current.tripFee > 0 {
-                    LabeledRow("├ Trip fee", "$" + String(format: "%.0f", current.tripFee))
+                    LabeledRow(L("├ Trip fee", "├ 跑趟费"), "$" + String(format: "%.0f", current.tripFee))
                 }
-                LabeledRow("Net (after supplies)", "$" + String(format: "%.2f", current.netProfit(supplyCost: data.settings.supplyCostPerSigning)))
-                                LabeledRow("Status", ["Scheduled", "Done", "No-show"][statusIndex])
-                LabeledRow("Payment", current.paid ? "Paid" : "Unpaid")
+                                LabeledRow(L("Status", "状态"), [L("Scheduled", "已约"), L("Done", "完成"), L("No-show", "没来")][statusIndex])
+                LabeledRow(L("Payment", "收款"), current.paid ? L("Paid", "已收") : L("Unpaid", "未收"))
                 // A1 账龄
                 if current.agingLevel > 0 {
-                    LabeledRow("Overdue", "\(current.unpaidDays) days unpaid")
+                    LabeledRow(L("Overdue", "逾期"), L("\(current.unpaidDays) days unpaid", "\(current.unpaidDays) 天未收"))
                 }
             }
-            Section("Notarial Acts") {
-                LabeledRow("Loan docs", "\(current.borrowDocs)")
-                LabeledRow("Trust docs", "\(current.trustDocs)")
-                LabeledRow("Other", "\(current.otherDocs)")
+            Section(L("Notarial Acts", "公证行为")) {
+                LabeledRow(L("Loan docs", "借款文件"), "\(current.borrowDocs)")
+                LabeledRow(L("Trust docs", "信托文件"), "\(current.trustDocs)")
+                LabeledRow(L("Other", "其他"), "\(current.otherDocs)")
             }
             // 健哥令③：后续处理——未收→标记已收（清账龄）；已收→改回未收
             if current.status == .done {
-                Section("Payment") {
+                Section(L("Payment", "收款")) {
                     if current.paid {
                         Button(role: .destructive) {
                             markUnpaid()
                         } label: {
-                            Label("Mark Unpaid", systemImage: "arrow.uturn.backward")
+                            Label(L("Mark Unpaid", "改回未收"), systemImage: "arrow.uturn.backward")
                         }
                     } else {
                         Button {
                             markPaid()
                         } label: {
-                            Label("Mark Paid (clear overdue)", systemImage: "checkmark.seal.fill")
+                            Label(L("Mark Paid (clear overdue)", "标记已收（清逾期）"), systemImage: "checkmark.seal.fill")
                         }
                         .buttonStyle(.borderedProminent)
                     }
                 }
             }
             if !current.note.isEmpty {
-                Section("Notes") { Text(current.note) }
+                Section(L("Notes", "备注")) { Text(current.note) }
             }
         }
-        .navigationTitle("Signing Details")
+        .navigationTitle(L("Signing Details", "签署单详情"))
     }
 
     var statusIndex: Int {
@@ -576,8 +574,6 @@ struct SigningDetailView: View {
             Store.save(data)
         }
     }
-
-    // A5 时薪判决（对照 settings.hourlyFloor）
 
 }
 
@@ -612,9 +608,9 @@ struct ClientListView: View {
                         Image(systemName: "person.2")
                             .font(.system(size: 52))
                             .foregroundColor(.indigo)
-                        Text("No clients yet")
+                        Text(L("No clients yet", "还没有客户"))
                             .font(.headline)
-                        Text("Clients are title companies / signing services. Track contacts and payment habits.")
+                        Text(L("Clients are title companies / signing services. Track contacts and payment habits.", "客户=标题公司/签约服务公司。记联系人和付款习惯。"))
                             .font(.footnote)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
@@ -629,11 +625,11 @@ struct ClientListView: View {
                                     HStack {
                                         Text(c.company).font(.headline)
                                         if c.noShowCount > 0 {
-                                            Text("\(c.noShowCount) no-shows").font(.caption2).foregroundColor(.orange)
+                                            Text(L("\(c.noShowCount) no-shows", "\(c.noShowCount) 次没来")).font(.caption2).foregroundColor(.orange)
                                         }
                                     }
                                     let count = data.signings.filter { $0.clientId == c.id }.count
-                                    Text("\(count) signings · \(c.contactName.isEmpty ? "无联系人" : c.contactName)")
+                                    Text(L("\(count) signings · \(c.contactName.isEmpty ? "no contact" : c.contactName)", "\(count) 单 · \(c.contactName.isEmpty ? "无联系人" : c.contactName)"))
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
@@ -643,7 +639,7 @@ struct ClientListView: View {
                     }
                 }
             }
-            .navigationTitle("Clients")
+            .navigationTitle(L("Clients", "客户"))
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button { showAdd = true } label: { Image(systemName: "plus") }
@@ -684,25 +680,25 @@ struct ClientDetailView: View {
     // A6 评级三档（从平均付款天数自动推）
     var rating: (label: String, color: Color) {
         guard let d = avgPayDays else {
-            return ("未评级（还没收过款）", .secondary)
+            return (L("Not rated (no payments yet)", "未评级（还没收过款）"), .secondary)
         }
-        if d <= 30 { return ("✅ 优选（平均 \(Int(d)) 天付款）", .green) }
-        if d <= 45 { return ("⚠️ 注意（平均 \(Int(d)) 天付款）", .orange) }
-        return ("🔴 拉黑观察（平均 \(Int(d)) 天付款）", .red)
+        if d <= 30 { return (L("✅ Preferred (avg \(Int(d)) days to pay)", "✅ 优选（平均 \(Int(d)) 天付款）"), .green) }
+        if d <= 45 { return (L("⚠️ Watch (avg \(Int(d)) days to pay)", "⚠️ 注意（平均 \(Int(d)) 天付款）"), .orange) }
+        return (L("🔴 Blacklist-watch (avg \(Int(d)) days to pay)", "🔴 拉黑观察（平均 \(Int(d)) 天付款）"), .red)
     }
 
     var body: some View {
         List {
             // A2/A6 付款速度+评级
-            Section("Payment Behavior") {
+            Section(L("Payment Behavior", "付款行为")) {
                 if let d = avgPayDays {
-                    LabeledRow("Avg days to pay", "\(Int(d))")
+                    LabeledRow(L("Avg days to pay", "平均付款天数"), "\(Int(d))")
                 }
                 Label(rating.label, systemImage: "star.fill")
                     .foregroundColor(rating.color)
             }
-            Section("Contact") {
-                if !current.contactName.isEmpty { LabeledRow("Contact", current.contactName) }
+            Section(L("Contact", "联系方式")) {
+                if !current.contactName.isEmpty { LabeledRow(L("Contact", "联系人"), current.contactName) }
                 if !current.phone.isEmpty {
                     Link(destination: URL(string: "tel://\(current.phone.filter { !$0.isWhitespace })")!) {
                         Label(current.phone, systemImage: "phone")
@@ -715,17 +711,17 @@ struct ClientDetailView: View {
                 }
             }
             if !current.notes.isEmpty {
-                Section("Notes") { Text(current.notes) }
+                Section(L("Notes", "备注")) { Text(current.notes) }
             }
             if current.noShowCount > 0 {
                 Section {
-                    Label("\(current.noShowCount) no-shows on record", systemImage: "exclamationmark.triangle")
+                    Label(L("\(current.noShowCount) no-shows on record", "记录在案：\(current.noShowCount) 次没来"), systemImage: "exclamationmark.triangle")
                         .foregroundColor(.orange)
                 }
             }
-            Section("Signing History") {
+            Section(L("Signing History", "签署历史")) {
                 if mySignings.isEmpty {
-                    Text("No signings yet").font(.footnote).foregroundColor(.secondary)
+                    Text(L("No signings yet", "还没有签署单")).font(.footnote).foregroundColor(.secondary)
                 } else {
                     ForEach(mySignings.prefix(10)) { s in
                         HStack {
@@ -760,13 +756,13 @@ struct FeedbackView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Feedback") {
+                Section(L("Feedback", "反馈意见")) {
                     TextEditor(text: $feedbackText)
                         .frame(minHeight: 120)
                         .overlay(
                             Group {
                                 if feedbackText.isEmpty {
-                                    Text("Any errors? Anything clunky? Missing features? Just write it.")
+                                    Text(L("Any errors? Anything clunky? Missing features? Just write it.", "有错？用着不顺？缺功能？直接写。"))
                                         .foregroundColor(.secondary)
                                         .font(.footnote)
                                         .padding(.top, 8)
@@ -785,14 +781,14 @@ struct FeedbackView: View {
                             sent = true
                         }
                     } label: {
-                        Label(sent ? "已打开邮件——发送即完成反馈" : "发送反馈（走你的邮件）", systemImage: "paperplane.fill")
+                        Label(sent ? L("Mail opened — send to finish", "已打开邮件——发送即完成反馈") : L("Send feedback (via your mail)", "发送反馈（走你的邮件）"), systemImage: "paperplane.fill")
                     }
                     .disabled(feedbackText.isEmpty)
                 } footer: {
-                    Text("Feedback goes straight to the developer by email. Nothing is stored in the app.")
+                    Text(L("Feedback goes straight to the developer by email. Nothing is stored in the app.", "反馈通过邮件直达开发者，App不留任何数据。"))
                 }
             }
-            .navigationTitle("Me")
+            .navigationTitle(L("Me", "我的"))
             .navigationBarTitleDisplayMode(.inline)
         }
     }
@@ -810,16 +806,16 @@ struct OverdueListView: View {
     var body: some View {
         List {
             Section {
-                LabeledRow("Overdue signings", "\(overdue.count)")
-                LabeledRow("Total overdue", "$" + String(format: "%.0f", total))
+                LabeledRow(L("Overdue signings", "逾期单数"), "\(overdue.count)")
+                LabeledRow(L("Total overdue", "逾期总额"), "$" + String(format: "%.0f", total))
             }
-            Section("Process Each") {
+            Section(L("Process Each", "逐单处理")) {
                 ForEach(overdue.sorted { $0.unpaidDays > $1.unpaidDays }) { s in
                     OverdueRow(signing: s, data: $data)
                 }
             }
         }
-        .navigationTitle("Overdue")
+        .navigationTitle(L("Overdue", "逾期"))
     }
 }
 
@@ -832,13 +828,13 @@ struct OverdueRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text(client?.company ?? "Unknown client").font(.headline)
+                Text(client?.company ?? L("Unknown client", "未知客户")).font(.headline)
                 Spacer()
                 Text("$\(signing.fee, specifier: "%.0f")").font(.headline)
             }
             HStack {
                 // 账龄色标
-                Text("Overdue \(signing.unpaidDays) days")
+                Text(L("Overdue \(signing.unpaidDays) days", "逾期 \(signing.unpaidDays) 天"))
                     .font(.caption)
                     .foregroundColor(signing.agingLevel == 2 ? .red : .orange)
                 Spacer()
@@ -849,7 +845,7 @@ struct OverdueRow: View {
                         Store.save(data)
                     }
                 } label: {
-                    Label("Mark Paid", systemImage: "checkmark.seal.fill")
+                    Label(L("Mark Paid", "标记已收"), systemImage: "checkmark.seal.fill")
                         .font(.caption)
                 }
                 .buttonStyle(.borderedProminent)
@@ -868,17 +864,15 @@ enum NTExporter {
         df.dateFormat = "yyyy-MM-dd HH:mm"
         df.locale = Locale(identifier: "zh_CN")
         var l: [String] = []
-        l.append("【签署单】\(client?.company ?? "未知客户")")
-        l.append("时间：\(df.string(from: s.date))")
-        if !s.address.isEmpty { l.append("地点：\(s.address)") }
-        l.append("Type: " + s.serviceType.display)
-        l.append("总费用：$" + String(format: "%.0f", s.fee) + "（公证费免税 $" + String(format: "%.0f", s.notaryFeePortion) + " + 服务费应税 $" + String(format: "%.0f", s.taxablePortion) + "）")
-        if s.tripFee > 0 { l.append("跑趟费：$" + String(format: "%.0f", s.tripFee)) }
-        l.append("耗材：$" + String(format: "%.2f", settings.supplyCostPerSigning))
-        l.append("净利：$" + String(format: "%.2f", s.netProfit(supplyCost: settings.supplyCostPerSigning)))
-        l.append("状态：\(s.status == .done ? "完成" : s.status == .noshow ? "没成功" : "已约") · \(s.paid ? "已收" : "未收")")
-        l.append("公证行为：借款 \(s.borrowDocs) / 信托 \(s.trustDocs) / 其他 \(s.otherDocs)")
-        if !s.note.isEmpty { l.append("备注：\(s.note)") }
+        l.append(L("【Signing】\(client?.company ?? L("Unknown client", "未知客户"))", "【签署单】\(client?.company ?? "未知客户")"))
+        l.append(L("Time: \(df.string(from: s.date))", "时间：\(df.string(from: s.date))"))
+        if !s.address.isEmpty { l.append(L("Location: \(s.address)", "地点：\(s.address)")) }
+        l.append(L("Type: ", "类型：") + s.serviceType.display)
+        l.append(L("Total: $", "总费用：$") + String(format: "%.0f", s.fee) + L(" (notary SE-exempt $", "（公证费免税 $") + String(format: "%.0f", s.notaryFeePortion) + L(" + service taxable $", " + 服务费应税 $") + String(format: "%.0f", s.taxablePortion) + L(")", "）"))
+        if s.tripFee > 0 { l.append(L("Trip fee: $", "跑趟费：$") + String(format: "%.0f", s.tripFee)) }
+        l.append(L("Status: \(s.status == .done ? "Done" : s.status == .noshow ? "No-show" : "Scheduled") · \(s.paid ? "Paid" : "Unpaid")", "状态：\(s.status == .done ? "完成" : s.status == .noshow ? "没成功" : "已约") · \(s.paid ? "已收" : "未收")"))
+        l.append(L("Notarial acts: loan \(s.borrowDocs) / trust \(s.trustDocs) / other \(s.otherDocs)", "公证行为：借款 \(s.borrowDocs) / 信托 \(s.trustDocs) / 其他 \(s.otherDocs)"))
+        if !s.note.isEmpty { l.append(L("Note: \(s.note)", "备注：\(s.note)")) }
         return l.joined(separator: "\n")
     }
 
@@ -888,27 +882,25 @@ enum NTExporter {
         let cal = Calendar.current
         let done = data.signings.filter { $0.status == .done && cal.isDate($0.date, equalTo: Date(), toGranularity: .month) }
         var l: [String] = []
-        l.append("【本月签署单总结】\(df.string(from: Date()))")
+        l.append(L("【Monthly Signing Summary】\(df.string(from: Date()))", "【本月签署单总结】\(df.string(from: Date()))"))
         l.append(String(repeating: "=", count: 30))
         let income = done.reduce(0) { $0 + $1.fee }
         let notary = done.reduce(0) { $0 + $1.notaryFeePortion }
-        let net = done.reduce(0.0) { $0 + $1.netProfit(supplyCost: data.settings.supplyCostPerSigning) }
-        l.append("单数：\(done.count)")
-        l.append("总收入：$" + String(format: "%.0f", income) )
-        l.append("  其中公证费（SE 免税）：$" + String(format: "%.0f", notary) )
-        l.append("  其中服务费（应税）：$" + String(format: "%.0f", income - notary) )
-        l.append("总净利：$" + String(format: "%.0f", net) )
+        l.append(L("Signings: \(done.count)", "单数：\(done.count)"))
+        l.append(L("Total income: $", "总收入：$") + String(format: "%.0f", income) )
+        l.append(L("  Notary portion (SE-exempt): $", "  其中公证费（SE 免税）：$") + String(format: "%.0f", notary) )
+        l.append(L("  Service portion (taxable): $", "  其中服务费（应税）：$") + String(format: "%.0f", income - notary) )
         let unpaid = data.signings.filter { $0.status == .done && !$0.paid }
         if !unpaid.isEmpty {
-            l.append("⚠️ 未收款 \(unpaid.count) 单，合计 $" + String(format: "%.0f", unpaid.reduce(0) { $0 + $1.fee }) + "：")
+            l.append(L("⚠️ Unpaid \(unpaid.count) signings, totaling $", "⚠️ 未收款 \(unpaid.count) 单，合计 $") + String(format: "%.0f", unpaid.reduce(0) { $0 + $1.fee }) + L(":", "："))
             for u in unpaid {
-                l.append("  - " + (data.clients.first { $0.id == u.clientId }?.company ?? "?") + " $" + String(format: "%.0f", u.fee) + "（\(u.unpaidDays) 天）")
+                l.append("  - " + (data.clients.first { $0.id == u.clientId }?.company ?? "?") + " $" + String(format: "%.0f", u.fee) + L(" (\(u.unpaidDays) days)", "（\(u.unpaidDays) 天）"))
             }
         }
-        l.append("——逐单明细——")
+        l.append(L("—— Per signing ——", "——逐单明细——"))
         for s in done.sorted(by: { $0.date < $1.date }) {
             let cn = data.clients.first { $0.id == s.clientId }?.company ?? "?"
-            l.append(df.string(from: s.date) + " " + cn + " $" + String(format: "%.0f", s.fee) + " " + (s.paid ? "已收" : "未收"))
+            l.append(df.string(from: s.date) + " " + cn + " $" + String(format: "%.0f", s.fee) + " " + (s.paid ? L("Paid", "已收") : L("Unpaid", "未收")))
         }
         return l.joined(separator: "\n")
     }
@@ -948,8 +940,13 @@ struct MonthCalendarView: View {
 
     private var monthTitle: String {
         let df = DateFormatter()
-        df.dateFormat = "yyyy年M月"
-        df.locale = Locale(identifier: "zh_CN")
+        if AppLang.current == .en {
+            df.dateFormat = "MMMM yyyy"
+            df.locale = Locale(identifier: "en_US")
+        } else {
+            df.dateFormat = "yyyy年M月"
+            df.locale = Locale(identifier: "zh_CN")
+        }
         return df.string(from: selectedMonth)
     }
 
@@ -973,7 +970,7 @@ struct MonthCalendarView: View {
                 Spacer()
                 Button { shiftMonth(1) } label: { Image(systemName: "chevron.right") }
             }
-            let weekdays = ["日", "一", "二", "三", "四", "五", "六"]
+            let weekdays = AppLang.current == .en ? ["S", "M", "T", "W", "T", "F", "S"] : ["日", "一", "二", "三", "四", "五", "六"]
             HStack(spacing: 0) {
                 ForEach(weekdays, id: \.self) { w in
                     Text(w).font(.caption2).foregroundColor(.secondary).frame(maxWidth: .infinity)
