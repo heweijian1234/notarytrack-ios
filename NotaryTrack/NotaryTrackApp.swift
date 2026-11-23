@@ -69,8 +69,12 @@ struct RootView: View {
 
 struct TodayView: View {
     @Binding var data: Store.Data
-    @State private var showAdd = false
-    @State private var showCommission = false
+    // S7.6坑2修（11-24）：两个sheet(isPresented:)互相覆盖→单sheet(item:)两态
+    private enum TodaySheet: Identifiable {
+        case add, commission
+        var id: String { switch self { case .add: return "add"; case .commission: return "commission" } }
+    }
+    @State private var todaySheet: TodaySheet?
 
     var commissionWarn: String? {
         guard let c = data.commission else { return nil }
@@ -104,84 +108,103 @@ struct TodayView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if data.signings.isEmpty && data.clients.isEmpty {
-                    VStack(spacing: 14) {
-                        Spacer()
-                        Image(systemName: "stamp")
-                            .font(.system(size: 52))
-                            .foregroundColor(.indigo)
-                        Text(L("Your signing agent book", "你的公证签署台账"))
-                            .font(.headline)
-                        Text(L("Add a client (title company) first, then log signings. Fees, trip fees, notarial acts — nothing missed.", "先加客户（标题公司），再记签署单。费用、跑趟费、公证行为——一样不漏。"))
-                            .font(.footnote)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 32)
-                        Spacer()
-                    }
-                } else {
-                    List {
-                        if let warn = commissionWarn {
-                            Section {
-                                Label(warn, systemImage: "exclamationmark.triangle.fill")
-                                    .foregroundColor(.red)
-                            }
-                        }
-                        // A9 该回访了
-                        if !dueFollowUps.isEmpty {
-                            Section(L("Due for follow-up", "该回访了")) {
-                                ForEach(dueFollowUps, id: \.0.id) { client, days, threshold in
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(client.company).font(.headline)
-                                            Text(L("\(days) days since last signing (\(threshold == 30 ? "business" : "individual") · \(threshold)-day norm)", "\(days) 天没新单（\(threshold == 30 ? "企业" : "个人") · \(threshold)天标准）"))
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                        }
-                                        Spacer()
-                                        if !client.phone.isEmpty {
-                                            Button {
-                                                if let url = URL(string: "tel://\(client.phone.filter { !$0.isWhitespace && $0 != "-" })") {
-                                                    UIApplication.shared.open(url)
-                                                }
-                                            } label: {
-                                                Image(systemName: "phone.fill")
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        ForEach(groupedByDay, id: \.0) { day, signings in
-                            Section(day) {
-                                ForEach(signings) { s in
-                                    SigningRow(signing: s, data: $data)
-                                }
-                            }
-                        }
-                        if data.signings.isEmpty {
-                            Text(L("No signings yet — tap + to add.", "还没有签署单——点右上角 + 添加。"))
-                                .font(.footnote)
+            // 11-24类型溢出预防拆（SigningListView同款药方）
+            if data.signings.isEmpty && data.clients.isEmpty {
+                todayEmptyState
+            } else {
+                todayList
+            }
+        }
+        .navigationTitle(L("Today", "今日"))
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    Button { if TrialStore.gate() { todaySheet = .add } } label: { Label(L("New Signing", "新签署单"), systemImage: "plus") }
+                    Button { if TrialStore.gate() { todaySheet = .commission } } label: { Label(L("Commission", "委托证"), systemImage: "credentialing") }
+                } label: { Image(systemName: "ellipsis.circle") }
+            }
+        }
+        .sheet(item: $todaySheet, onDismiss: { data = Store.load() }) { item in
+            switch item {
+            case .add: SigningEditor(data: $data, preselectedClientId: nil)
+            case .commission: CommissionEditor(data: $data)
+            }
+        }
+    }
+
+    private var todayEmptyState: some View {
+        VStack(spacing: 14) {
+            Spacer()
+            Image(systemName: "stamp")
+                .font(.system(size: 52))
+                .foregroundColor(.indigo)
+            Text(L("Your signing agent book", "你的公证签署台账"))
+                .font(.headline)
+            Text(L("Add a client (title company) first, then log signings. Fees, trip fees, notarial acts — nothing missed.", "先加客户（标题公司），再记签署单。费用、跑趟费、公证行为——一样不漏。"))
+                .font(.footnote)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+            Spacer()
+        }
+    }
+
+    private var todayList: some View {
+        List {
+            commissionWarnSection
+            followUpSection
+            dayGroupsSection
+            if data.signings.isEmpty {
+                Text(L("No signings yet — tap + to add.", "还没有签署单——点右上角 + 添加。"))
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+
+    @ViewBuilder private var commissionWarnSection: some View {
+        if let warn = commissionWarn {
+            Section {
+                Label(warn, systemImage: "exclamationmark.triangle.fill")
+                    .foregroundColor(.red)
+            }
+        }
+    }
+
+    // A9 该回访了
+    @ViewBuilder private var followUpSection: some View {
+        if !dueFollowUps.isEmpty {
+            Section(L("Due for follow-up", "该回访了")) {
+                ForEach(dueFollowUps, id: \.0.id) { client, days, threshold in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(client.company).font(.headline)
+                            Text(L("\(days) days since last signing (\(threshold == 30 ? "business" : "individual") · \(threshold)-day norm)", "\(days) 天没新单（\(threshold == 30 ? "企业" : "个人") · \(threshold)天标准）"))
+                                .font(.caption)
                                 .foregroundColor(.secondary)
                         }
+                        Spacer()
+                        if !client.phone.isEmpty {
+                            Button {
+                                if let url = URL(string: "tel://\(client.phone.filter { !$0.isWhitespace && $0 != "-" })") {
+                                    UIApplication.shared.open(url)
+                                }
+                            } label: {
+                                Image(systemName: "phone.fill")
+                            }
+                        }
                     }
                 }
             }
-            .navigationTitle(L("Today", "今日"))
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Menu {
-                        Button { if TrialStore.gate() { showAdd = true } } label: { Label(L("New Signing", "新签署单"), systemImage: "plus") }
-                        Button { if TrialStore.gate() { showCommission = true } } label: { Label(L("Commission", "委托证"), systemImage: "credentialing") }
-                    } label: { Image(systemName: "ellipsis.circle") }
+        }
+    }
+
+    private var dayGroupsSection: some View {
+        ForEach(groupedByDay, id: \.0) { day, signings in
+            Section(day) {
+                ForEach(signings) { s in
+                    SigningRow(signing: s, data: $data)
                 }
-            }
-            .sheet(isPresented: $showAdd, onDismiss: { data = Store.load() }) {
-                SigningEditor(data: $data, preselectedClientId: nil)
-            }
-            .sheet(isPresented: $showCommission, onDismiss: { data = Store.load() }) {
-                CommissionEditor(data: $data)
             }
         }
     }
@@ -404,54 +427,64 @@ struct SigningListView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if data.signings.isEmpty {
-                    emptyState
-                } else {
-                    List {
-                        // A1 拖款账龄警示条（最愤怒痛点置顶）
-                        if monthSummary.overdueCount > 0 {
-                            Section {
-                                NavigationLink(destination: OverdueListView(overdue: overdueSignings, data: $data)) {
-                                    Label(L("\(monthSummary.overdueCount) overdue, totaling $\(monthSummary.overdueAmount, specifier: "%.0f") (30+ days)", "\(monthSummary.overdueCount) 单逾期，合计 $\(monthSummary.overdueAmount, specifier: "%.0f")（超30天）"),
-                                          systemImage: "clock.badge.exclamationmark.fill")
-                                        .font(.footnote)
-                                        .foregroundColor(.red)
-                                }
-                            }
-                        }
-                        monthSection
-                        // 健哥令②：年度累计
-                        yearSection
-                        Section(L("All Signings", "全部签署单")) {
-                            ForEach(sortedDesc) { s in
-                                SigningListRow(s: s, data: $data, sortedDesc: sortedDesc)
-                            }
-                            // 健哥令④：左滑删除（onDelete 必须挂在 ForEach 直接内容上）
-                            .onDelete { offsets in
-                                guard TrialStore.gate() else { return }
-                                for i in offsets {
-                                    let target = sortedDesc[i]
-                                    data.signings.removeAll { $0.id == target.id }
-                                }
-                                Store.save(data)
-                            }
-                        }
-                    }
-                }
+            // 11-24类型溢出二轮根修：去Group层+List整体独立属性（编译器逐段推断）
+            if data.signings.isEmpty {
+                emptyState
+            } else {
+                signingsList
             }
-            .navigationTitle(L("Signings", "签署单"))
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button { if TrialStore.gate() { showAdd = true } } label: { Image(systemName: "plus") }
-                }
+        }
+        .navigationTitle(L("Signings", "签署单"))
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button { if TrialStore.gate() { showAdd = true } } label: { Image(systemName: "plus") }
             }
-            .sheet(isPresented: $showAdd, onDismiss: { data = Store.load() }) {
-                SigningEditor(data: $data, preselectedClientId: nil)
+        }
+        .sheet(isPresented: $showAdd, onDismiss: { data = Store.load() }) {
+            SigningEditor(data: $data, preselectedClientId: nil)
+        }
+    }
+
+    // 11-24类型溢出二轮根修：List整体+各段独立属性
+    private var signingsList: some View {
+        List {
+            overdueWarnSection
+            monthSection
+            yearSection
+            allSigningsSection
+        }
+    }
+
+    // A1 拖款账龄警示条（最愤怒痛点置顶）
+    @ViewBuilder private var overdueWarnSection: some View {
+        if monthSummary.overdueCount > 0 {
+            Section {
+                NavigationLink(destination: OverdueListView(overdue: overdueSignings, data: $data)) {
+                    Label(L("\(monthSummary.overdueCount) overdue, totaling $\(monthSummary.overdueAmount, specifier: "%.0f") (30+ days)", "\(monthSummary.overdueCount) 单逾期，合计 $\(monthSummary.overdueAmount, specifier: "%.0f")（超30天）"),
+                          systemImage: "clock.badge.exclamationmark.fill")
+                        .font(.footnote)
+                        .foregroundColor(.red)
+                }
             }
         }
     }
 
+    private var allSigningsSection: some View {
+        Section(L("All Signings", "全部签署单")) {
+            ForEach(sortedDesc) { s in
+                SigningListRow(s: s, data: $data, sortedDesc: sortedDesc)
+            }
+            // 健哥令④：左滑删除（onDelete 必须挂在 ForEach 直接内容上）
+            .onDelete { offsets in
+                guard TrialStore.gate() else { return }
+                for i in offsets {
+                    let target = sortedDesc[i]
+                    data.signings.removeAll { $0.id == target.id }
+                }
+                Store.save(data)
+            }
+        }
+    }
 
     // 11-24类型检查溢出根修：拆子视图（本文件353/374/397历史同款药方——L()化后body再超限）
     private var emptyState: some View {
@@ -650,55 +683,62 @@ struct ClientListView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if data.clients.isEmpty {
-                    VStack(spacing: 14) {
-                        Spacer()
-                        Image(systemName: "person.2")
-                            .font(.system(size: 52))
-                            .foregroundColor(.indigo)
-                        Text(L("No clients yet", "还没有客户"))
-                            .font(.headline)
-                        Text(L("Clients are title companies / signing services. Track contacts and payment habits.", "客户=标题公司/签约服务公司。记联系人和付款习惯。"))
-                            .font(.footnote)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 32)
-                        Spacer()
-                    }
-                } else {
-                    List {
-                        ForEach(data.clients) { c in
-                            NavigationLink(destination: ClientDetailView(client: c, data: $data)) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    HStack {
-                                        Text(c.company).font(.headline)
-                                        if c.noShowCount > 0 {
-                                            Text(L("\(c.noShowCount) no-shows", "\(c.noShowCount) 次没来")).font(.caption2).foregroundColor(.orange)
-                                        }
-                                    }
-                                    let count = data.signings.filter { $0.clientId == c.id }.count
-                                    Text(L("\(count) signings · \(c.contactName.isEmpty ? "no contact" : c.contactName)", "\(count) 单 · \(c.contactName.isEmpty ? "无联系人" : c.contactName)"))
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
+            // 11-24类型溢出预防拆（同款药方）
+            if data.clients.isEmpty {
+                clientEmptyState
+            } else {
+                clientList
+            }
+        }
+        .navigationTitle(L("Clients", "客户"))
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button { if TrialStore.gate() { showAdd = true } } label: { Image(systemName: "plus") }
+            }
+        }
+        .sheet(isPresented: $showAdd, onDismiss: { data = Store.load() }) {
+            ClientEditor(data: $data, existing: nil)
+        }
+    }
+
+    private var clientEmptyState: some View {
+        VStack(spacing: 14) {
+            Spacer()
+            Image(systemName: "person.2")
+                .font(.system(size: 52))
+                .foregroundColor(.indigo)
+            Text(L("No clients yet", "还没有客户"))
+                .font(.headline)
+            Text(L("Clients are title companies / signing services. Track contacts and payment habits.", "客户=标题公司/签约服务公司。记联系人和付款习惯。"))
+                .font(.footnote)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+            Spacer()
+        }
+    }
+
+    private var clientList: some View {
+        List {
+            ForEach(data.clients) { c in
+                NavigationLink(destination: ClientDetailView(client: c, data: $data)) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack {
+                            Text(c.company).font(.headline)
+                            if c.noShowCount > 0 {
+                                Text(L("\(c.noShowCount) no-shows", "\(c.noShowCount) 次没来")).font(.caption2).foregroundColor(.orange)
                             }
                         }
-                        .onDelete { offsets in
-                            guard TrialStore.gate() else { return }
-                            data.clients.remove(atOffsets: offsets); Store.save(data)
-                        }
+                        let count = data.signings.filter { $0.clientId == c.id }.count
+                        Text(L("\(count) signings · \(c.contactName.isEmpty ? "no contact" : c.contactName)", "\(count) 单 · \(c.contactName.isEmpty ? "无联系人" : c.contactName)"))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
                 }
             }
-            .navigationTitle(L("Clients", "客户"))
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button { if TrialStore.gate() { showAdd = true } } label: { Image(systemName: "plus") }
-                }
-            }
-            .sheet(isPresented: $showAdd, onDismiss: { data = Store.load() }) {
-                ClientEditor(data: $data, existing: nil)
+            .onDelete { offsets in
+                guard TrialStore.gate() else { return }
+                data.clients.remove(atOffsets: offsets); Store.save(data)
             }
         }
     }
