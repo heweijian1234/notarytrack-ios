@@ -460,7 +460,7 @@ struct SigningListView: View {
         if monthSummary.overdueCount > 0 {
             Section {
                 NavigationLink(destination: OverdueListView(overdue: overdueSignings, data: $data)) {
-                    Label(L("\(monthSummary.overdueCount) overdue, totaling $\(monthSummary.overdueAmount, specifier: "%.0f") (30+ days)", "\(monthSummary.overdueCount) 单逾期，合计 $\(monthSummary.overdueAmount, specifier: "%.0f")（超30天）"),
+                    Label(L("\(monthSummary.overdueCount) overdue, totaling $\(String(format: "%.0f", monthSummary.overdueAmount)) (30+ days)", "\(monthSummary.overdueCount) 单逾期，合计 $\(String(format: "%.0f", monthSummary.overdueAmount))（超30天）"),
                           systemImage: "clock.badge.exclamationmark.fill")
                         .font(.footnote)
                         .foregroundColor(.red)
