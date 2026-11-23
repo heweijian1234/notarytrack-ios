@@ -406,18 +406,7 @@ struct SigningListView: View {
         NavigationStack {
             Group {
                 if data.signings.isEmpty {
-                    VStack(spacing: 14) {
-                        Spacer()
-                        Image(systemName: "doc.text")
-                            .font(.system(size: 52))
-                            .foregroundColor(.indigo)
-                        Text(L("No signings yet", "还没有签署单"))
-                            .font(.headline)
-                        Text(L("Log your first signing: client, fee, notarial acts.", "记第一单：客户、费用、公证行为。"))
-                            .font(.footnote)
-                            .foregroundColor(.secondary)
-                        Spacer()
-                    }
+                    emptyState
                 } else {
                     List {
                         // A1 拖款账龄警示条（最愤怒痛点置顶）
@@ -431,41 +420,9 @@ struct SigningListView: View {
                                 }
                             }
                         }
-                        Section(L("This Month", "本月")) {
-                            HStack {
-                                StatCell(L("Signings", "单数"), "\(monthSummary.count)")
-                                StatCell(L("Income", "收入"), "$" + String(format: "%.0f", monthSummary.income))
-                                StatCell(L("Trip fees", "跑趟费"), "$" + String(format: "%.0f", monthSummary.tripFees))
-                            }
-                            // A4 SE 免税拆分 + 税预估
-                            HStack(spacing: 16) {
-                                Label(L("Notary (SE-exempt) $", "公证费（免SE税）$") + String(format: "%.0f", monthSummary.notaryPortion), systemImage: "checkmark.shield")
-                                    .foregroundColor(.green)
-                                Label(L("Service $", "服务费 $") + String(format: "%.0f", monthSummary.taxablePortion), systemImage: "doc.text")
-                            }
-                            .font(.caption)
-                            Label(L("Est. SE tax $", "预估SE税 $") + String(format: "%.0f", monthSummary.taxablePortion * 0.153) + L(" (taxable × 15.3%)", "（应税部分×15.3%）"), systemImage: "percent")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            if monthSummary.unpaid > 0 {
-                                Label(L("\(monthSummary.unpaid) signings unpaid", "\(monthSummary.unpaid) 单未收款"), systemImage: "exclamationmark.circle")
-                                    .font(.footnote)
-                                    .foregroundColor(.orange)
-                            }
-                        }
+                        monthSection
                         // 健哥令②：年度累计
-                        Section(L("Year to Date", "今年累计")) {
-                            HStack {
-                                StatCell(L("Signings", "单数"), "\(yearSummary.count)")
-                                StatCell(L("Income", "收入"), "$" + String(format: "%.0f", yearSummary.income))
-                            }
-                            HStack(spacing: 16) {
-                                Label(L("Notary (SE-exempt) $", "公证费（免SE税）$") + String(format: "%.0f", yearSummary.notaryPortion), systemImage: "checkmark.shield")
-                                    .foregroundColor(.green)
-                                Label(L("Service $", "服务费 $") + String(format: "%.0f", yearSummary.taxablePortion), systemImage: "doc.text")
-                            }
-                            .font(.caption)
-                        }
+                        yearSection
                         Section(L("All Signings", "全部签署单")) {
                             ForEach(sortedDesc) { s in
                                 SigningListRow(s: s, data: $data, sortedDesc: sortedDesc)
@@ -495,6 +452,62 @@ struct SigningListView: View {
         }
     }
 
+
+    // 11-24类型检查溢出根修：拆子视图（本文件353/374/397历史同款药方——L()化后body再超限）
+    private var emptyState: some View {
+        VStack(spacing: 14) {
+            Spacer()
+            Image(systemName: "doc.text")
+                .font(.system(size: 52))
+                .foregroundColor(.indigo)
+            Text(L("No signings yet", "还没有签署单"))
+                .font(.headline)
+            Text(L("Log your first signing: client, fee, notarial acts.", "记第一单：客户、费用、公证行为。"))
+                .font(.footnote)
+                .foregroundColor(.secondary)
+            Spacer()
+        }
+    }
+
+    private var monthSection: some View {
+        Section(L("This Month", "本月")) {
+            HStack {
+                StatCell(L("Signings", "单数"), "\(monthSummary.count)")
+                StatCell(L("Income", "收入"), "$" + String(format: "%.0f", monthSummary.income))
+                StatCell(L("Trip fees", "跑趟费"), "$" + String(format: "%.0f", monthSummary.tripFees))
+            }
+            // A4 SE 免税拆分 + 税预估
+            HStack(spacing: 16) {
+                Label(L("Notary (SE-exempt) $", "公证费（免SE税）$") + String(format: "%.0f", monthSummary.notaryPortion), systemImage: "checkmark.shield")
+                    .foregroundColor(.green)
+                Label(L("Service $", "服务费 $") + String(format: "%.0f", monthSummary.taxablePortion), systemImage: "doc.text")
+            }
+            .font(.caption)
+            Label(L("Est. SE tax $", "预估SE税 $") + String(format: "%.0f", monthSummary.taxablePortion * 0.153) + L(" (taxable × 15.3%)", "（应税部分×15.3%）"), systemImage: "percent")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            if monthSummary.unpaid > 0 {
+                Label(L("\(monthSummary.unpaid) signings unpaid", "\(monthSummary.unpaid) 单未收款"), systemImage: "exclamationmark.circle")
+                    .font(.footnote)
+                    .foregroundColor(.orange)
+            }
+        }
+    }
+
+    private var yearSection: some View {
+        Section(L("Year to Date", "今年累计")) {
+            HStack {
+                StatCell(L("Signings", "单数"), "\(yearSummary.count)")
+                StatCell(L("Income", "收入"), "$" + String(format: "%.0f", yearSummary.income))
+            }
+            HStack(spacing: 16) {
+                Label(L("Notary (SE-exempt) $", "公证费（免SE税）$") + String(format: "%.0f", yearSummary.notaryPortion), systemImage: "checkmark.shield")
+                    .foregroundColor(.green)
+                Label(L("Service $", "服务费 $") + String(format: "%.0f", yearSummary.taxablePortion), systemImage: "doc.text")
+            }
+            .font(.caption)
+        }
+    }
 
     var sortedDesc: [Signing] {
         data.signings.sorted { $0.date > $1.date }
