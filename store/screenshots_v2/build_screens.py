@@ -32,6 +32,24 @@ def caption(kicker, line):
   <div style="font-size:28px;color:#9fc3b4;margin-top:12px">{line}</div>
 </div>'''
 
+def status_bar_svg(color="#000000"):
+    """iOS 真实状态栏右区：蜂窝四格信号 + WiFi 扇弧 + 电池（SVG 绘制，2.3.10 修复——
+    旧版"▲▲ ⌁ ▮"被苹果点名 non-Apple platform status bar，禁再复用旧画法）"""
+    return f'''<span style="display:flex;align-items:center;gap:12px">
+<svg width="78" height="26" viewBox="0 0 78 26"><g fill="{color}">
+<rect x="0"  y="16" width="6" height="9"  rx="2"/>
+<rect x="11" y="12" width="6" height="13" rx="2"/>
+<rect x="22" y="7"  width="6" height="18" rx="2"/>
+<rect x="33" y="2"  width="6" height="23" rx="2"/>
+</g><g fill="none" stroke="{color}" stroke-width="4" stroke-linecap="round">
+<path d="M52 9 A16 16 0 0 0 40 4.5"/>
+<path d="M56 14 A22 22 0 0 0 38 7.5" opacity="0.45"/>
+<path d="M60 19 A28 28 0 0 0 36 10.5" opacity="0.25"/>
+</g><circle cx="47" cy="15" r="3" fill="{color}"/>
+<rect x="66" y="6" width="10" height="15" rx="3" fill="none" stroke="{color}" stroke-width="2" opacity="0.4"/>
+<rect x="68" y="8" width="6" height="11" rx="1.5" fill="{color}"/>
+</svg></span>'''
+
 def phone_frame(inner, tab_active):
     """iPhone 机身框（深色边+灵动岛）+ 内部真实 UI + 底部 Tab 栏"""
     tabs = ""
@@ -51,7 +69,7 @@ def phone_frame(inner, tab_active):
   <div style="background:rgba(242,242,247,.94);padding:26px 40px 20px;display:flex;justify-content:space-between;align-items:center">
     <span style="font-size:26px;color:{IOS_TEXT};font-weight:600">9:41</span>
     <div style="width:270px;height:66px;background:#111;border-radius:0 0 30px 30px;position:absolute;left:50%;transform:translateX(-50%);top:22px"></div>
-    <span style="font-size:24px;color:{IOS_TEXT}">▲▲ ⌁ ▮</span>
+    {status_bar_svg()}
   </div>
   {inner}
   <div style="margin-top:auto;background:rgba(242,242,247,.94);border-top:1px solid {IOS_SEP};
