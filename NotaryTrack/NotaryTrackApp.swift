@@ -119,8 +119,18 @@ struct TodayView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
-                    Button { if TrialStore.gate() { todaySheet = .add } } label: { Label(L("New Signing", "新签署单"), systemImage: "plus") }
-                    Button { if TrialStore.gate() { todaySheet = .commission } } label: { Label(L("Commission", "委托证"), systemImage: "credentialing") }
+                    // 🔴iOS 26 系统bug（11-27真机实锤）：Menu按钮直接赋值sheet状态→菜单模态未收起
+                    // sheet被UIKit拒绝呈现（"already presenting"）。修法=延迟一拍（等菜单收完）再赋值。
+                    Button {
+                        if TrialStore.gate() {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { todaySheet = .add }
+                        }
+                    } label: { Label(L("New Signing", "新签署单"), systemImage: "plus") }
+                    Button {
+                        if TrialStore.gate() {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { todaySheet = .commission }
+                        }
+                    } label: { Label(L("Commission", "委托证"), systemImage: "credentialing") }
                 } label: { Image(systemName: "ellipsis.circle") }
             }
         }
