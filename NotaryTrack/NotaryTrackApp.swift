@@ -108,8 +108,6 @@ struct TodayView: View {
 
     var body: some View {
         NavigationStack {
-            // 🔴Group包裹铁律（11-27真机实锤）：iOS 26上NavigationStack的root若是裸if/else，
-            // toolbar/navigationTitle会挂丢（+号整个消失）。Group包一层=稳定（G仓同款被真机验证）。
             Group {
                 if data.signings.isEmpty && data.clients.isEmpty {
                     todayEmptyState
@@ -117,30 +115,32 @@ struct TodayView: View {
                     todayList
                 }
             }
-        }
-        .navigationTitle(L("Today", "今日"))
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Menu {
-                    // 🔴iOS 26 系统bug（11-27真机实锤）：Menu按钮直接赋值sheet状态→菜单模态未收起
-                    // sheet被UIKit拒绝呈现（"already presenting"）。修法=延迟一拍（等菜单收完）再赋值。
-                    Button {
-                        if TrialStore.gate() {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { todaySheet = .add }
-                        }
-                    } label: { Label(L("New Signing", "新签署单"), systemImage: "plus") }
-                    Button {
-                        if TrialStore.gate() {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { todaySheet = .commission }
-                        }
-                    } label: { Label(L("Commission", "委托证"), systemImage: "credentialing") }
-                } label: { Image(systemName: "ellipsis.circle") }
+            // 🔴挂载点铁律（11-27真机三轮实锤）：navigationTitle/toolbar/sheet 必须挂在
+            // NavigationStack 【里面】的内容上（G仓结构，真机验证好使）；挂在 Stack 外面
+            // iOS 26 会把导航栏整个不渲染（标题+号全消失，Me页单根Form不受影响所以正常）。
+            .navigationTitle(L("Today", "今日"))
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Menu {
+                        // 🔴iOS 26 Menu→sheet 系统bug：延迟一拍（等菜单模态收完）再赋值。
+                        Button {
+                            if TrialStore.gate() {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { todaySheet = .add }
+                            }
+                        } label: { Label(L("New Signing", "新签署单"), systemImage: "plus") }
+                        Button {
+                            if TrialStore.gate() {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { todaySheet = .commission }
+                            }
+                        } label: { Label(L("Commission", "委托证"), systemImage: "credentialing") }
+                    } label: { Image(systemName: "ellipsis.circle") }
+                }
             }
-        }
-        .sheet(item: $todaySheet, onDismiss: { data = Store.load() }) { item in
-            switch item {
-            case .add: SigningEditor(data: $data, preselectedClientId: nil)
-            case .commission: CommissionEditor(data: $data)
+            .sheet(item: $todaySheet, onDismiss: { data = Store.load() }) { item in
+                switch item {
+                case .add: SigningEditor(data: $data, preselectedClientId: nil)
+                case .commission: CommissionEditor(data: $data)
+                }
             }
         }
     }
@@ -440,7 +440,6 @@ struct SigningListView: View {
 
     var body: some View {
         NavigationStack {
-            // 🔴Group包裹铁律（11-27真机实锤）：裸if/else做root会让toolbar挂丢（同TodayView）
             Group {
                 if data.signings.isEmpty {
                     emptyState
@@ -448,15 +447,16 @@ struct SigningListView: View {
                     signingsList
                 }
             }
-        }
-        .navigationTitle(L("Signings", "签署单"))
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button { if TrialStore.gate() { showAdd = true } } label: { Image(systemName: "plus") }
+            // 🔴挂载点铁律：修饰符挂 NavigationStack 里面的内容上（同 TodayView，11-27三轮实锤）
+            .navigationTitle(L("Signings", "签署单"))
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button { if TrialStore.gate() { showAdd = true } } label: { Image(systemName: "plus") }
+                }
             }
-        }
-        .sheet(isPresented: $showAdd, onDismiss: { data = Store.load() }) {
-            SigningEditor(data: $data, preselectedClientId: nil)
+            .sheet(isPresented: $showAdd, onDismiss: { data = Store.load() }) {
+                SigningEditor(data: $data, preselectedClientId: nil)
+            }
         }
     }
 
@@ -698,7 +698,6 @@ struct ClientListView: View {
 
     var body: some View {
         NavigationStack {
-            // 🔴Group包裹铁律（11-27真机实锤）：裸if/else做root会让toolbar挂丢（同TodayView）
             Group {
                 if data.clients.isEmpty {
                     clientEmptyState
@@ -706,15 +705,16 @@ struct ClientListView: View {
                     clientList
                 }
             }
-        }
-        .navigationTitle(L("Clients", "客户"))
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button { if TrialStore.gate() { showAdd = true } } label: { Image(systemName: "plus") }
+            // 🔴挂载点铁律：修饰符挂 NavigationStack 里面的内容上（同 TodayView，11-27三轮实锤）
+            .navigationTitle(L("Clients", "客户"))
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button { if TrialStore.gate() { showAdd = true } } label: { Image(systemName: "plus") }
+                }
             }
-        }
-        .sheet(isPresented: $showAdd, onDismiss: { data = Store.load() }) {
-            ClientEditor(data: $data, existing: nil)
+            .sheet(isPresented: $showAdd, onDismiss: { data = Store.load() }) {
+                ClientEditor(data: $data, existing: nil)
+            }
         }
     }
 
