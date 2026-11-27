@@ -108,11 +108,14 @@ struct TodayView: View {
 
     var body: some View {
         NavigationStack {
-            // 11-24类型溢出预防拆（SigningListView同款药方）
-            if data.signings.isEmpty && data.clients.isEmpty {
-                todayEmptyState
-            } else {
-                todayList
+            // 🔴Group包裹铁律（11-27真机实锤）：iOS 26上NavigationStack的root若是裸if/else，
+            // toolbar/navigationTitle会挂丢（+号整个消失）。Group包一层=稳定（G仓同款被真机验证）。
+            Group {
+                if data.signings.isEmpty && data.clients.isEmpty {
+                    todayEmptyState
+                } else {
+                    todayList
+                }
             }
         }
         .navigationTitle(L("Today", "今日"))
@@ -437,11 +440,13 @@ struct SigningListView: View {
 
     var body: some View {
         NavigationStack {
-            // 11-24类型溢出二轮根修：去Group层+List整体独立属性（编译器逐段推断）
-            if data.signings.isEmpty {
-                emptyState
-            } else {
-                signingsList
+            // 🔴Group包裹铁律（11-27真机实锤）：裸if/else做root会让toolbar挂丢（同TodayView）
+            Group {
+                if data.signings.isEmpty {
+                    emptyState
+                } else {
+                    signingsList
+                }
             }
         }
         .navigationTitle(L("Signings", "签署单"))
@@ -693,11 +698,13 @@ struct ClientListView: View {
 
     var body: some View {
         NavigationStack {
-            // 11-24类型溢出预防拆（同款药方）
-            if data.clients.isEmpty {
-                clientEmptyState
-            } else {
-                clientList
+            // 🔴Group包裹铁律（11-27真机实锤）：裸if/else做root会让toolbar挂丢（同TodayView）
+            Group {
+                if data.clients.isEmpty {
+                    clientEmptyState
+                } else {
+                    clientList
+                }
             }
         }
         .navigationTitle(L("Clients", "客户"))
