@@ -69,10 +69,10 @@ struct RootView: View {
 
 struct TodayView: View {
     @Binding var data: Store.Data
-    // S7.6坑2修（11-24）：两个sheet(isPresented:)互相覆盖→单sheet(item:)两态
+    // 11-28⑤：今日页不再新建签署单（签署单页已有），sheet 只剩委托证一态
     private enum TodaySheet: Identifiable {
-        case add, commission
-        var id: String { switch self { case .add: return "add"; case .commission: return "commission" } }
+        case commission
+        var id: String { "commission" }
     }
     @State private var todaySheet: TodaySheet?
 
@@ -94,10 +94,15 @@ struct TodayView: View {
                 s.clientId == c.id && s.agingLevel == 2 && !s.paid
             }
             if overdue90 { continue }
-            let lastDone = data.signings
+            // 11-28健哥报 bug：新客户一笔完成单都没有时 min() 落空 → Int.max → "NNNN 天没新单"。
+            // 正解：没合作过的客户（只加了档案没做过单）不进回访列表——刚建档=刚接触，谈不上回访。
+            let doneDates = data.signings
                 .filter { $0.clientId == c.id && ($0.status == .done || $0.status == .noshow) }
-                .compactMap { Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: $0.date), to: today).day }
-                .min() ?? Int.max
+                .map { Calendar.current.startOfDay(for: $0.date) }
+            guard let firstDone = doneDates.min() else { continue }
+            let lastDone = doneDates
+                .compactMap { Calendar.current.dateComponents([.day], from: $0, to: today).day }
+                .min() ?? 0
             let threshold = c.isBusiness ? 30 : 90
             if lastDone >= threshold {
                 result.append((c, lastDone, threshold))
@@ -120,27 +125,17 @@ struct TodayView: View {
             // iOS 26 会把导航栏整个不渲染（标题+号全消失，Me页单根Form不受影响所以正常）。
             .navigationTitle(L("Today", "今日"))
             .toolbar {
+                // 健哥 2026-11-28⑤：去掉「+新签署单」（签署单页已有，不重复），只留委托证入口
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Menu {
-                        // 🔴iOS 26 Menu→sheet 系统bug：延迟一拍（等菜单模态收完）再赋值。
-                        Button {
-                            if TrialStore.gate() {
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { todaySheet = .add }
-                            }
-                        } label: { Label(L("New Signing", "新签署单"), systemImage: "plus") }
-                        Button {
-                            if TrialStore.gate() {
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { todaySheet = .commission }
-                            }
-                        } label: { Label(L("Commission", "委托证"), systemImage: "credentialing") }
-                    } label: { Image(systemName: "ellipsis.circle") }
+                    Button {
+                        if TrialStore.gate() {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { todaySheet = .commission }
+                        }
+                    } label: { Image(systemName: "credentialing") }
                 }
             }
             .sheet(item: $todaySheet, onDismiss: { data = Store.load() }) { item in
-                switch item {
-                case .add: SigningEditor(data: $data, preselectedClientId: nil)
-                case .commission: CommissionEditor(data: $data)
-                }
+                CommissionEditor(data: $data)
             }
         }
     }
@@ -153,7 +148,7 @@ struct TodayView: View {
                 .foregroundColor(.indigo)
             Text(L("Your signing agent book", "你的公证签署台账"))
                 .font(.headline)
-            Text(L("Add a client (title company) first, then log signings. Fees, trip fees, notarial acts — nothing missed.", "先加客户（标题公司），再记签署单。费用、跑趟费、公证行为——一样不漏。"))
+            Text(L("Add a client (title company) first, then log signings. Fees, trip fees, notary documents — nothing missed.", "先加客户（标题公司），再记签署单。费用、跑趟费、公证所需文件——一样不漏。"))
                 .font(.footnote)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -168,7 +163,7 @@ struct TodayView: View {
             followUpSection
             dayGroupsSection
             if data.signings.isEmpty {
-                Text(L("No signings yet — tap + to add.", "还没有签署单——点右上角 + 添加。"))
+                Text(L("No signings yet — add from the Signings tab.", "还没有签署单——去签署单页添加。"))
                     .font(.footnote)
                     .foregroundColor(.secondary)
             }
@@ -263,6 +258,18 @@ struct SigningRow: View {
                 Text(tf.string(from: signing.date))
                     .font(.caption)
                     .foregroundColor(.secondary)
+            }
+            // 健哥 2026-11-28④：今日订单能看到业务类型 + 要带什么文件
+            HStack(spacing: 8) {
+                Text("\(signing.serviceType.emoji) \(signing.serviceType.display)")
+                    .font(.caption)
+                    .foregroundColor(.indigo)
+                if !signing.effectiveDocItems.isEmpty {
+                    Text(signing.effectiveDocItems.map { "\($0.name)×\($0.count)" }.joined(separator: " · "))
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
             }
             HStack(spacing: 10) {
                 Label("$\(signing.fee, specifier: "%.0f")", systemImage: "dollarsign.circle")
@@ -414,22 +421,10 @@ struct SigningListView: View {
             done.reduce(0) { $0 + $1.notaryFeePortion },
             done.reduce(0) { $0 + $1.taxablePortion },
             done.reduce(0) { $0 + $1.tripFee },
-            done.reduce(0) { $0 + $1.borrowDocs + $1.trustDocs + $1.otherDocs },
+            done.reduce(0) { $0 + $1.totalDocCount },
             data.signings.filter { $0.status == .done && !$0.paid }.count,
             overdue.reduce(0) { $0 + $1.fee },
             overdue.count
-        )
-    }
-
-    /// 健哥令②：年度累计（今年至今——报税直用）
-    var yearSummary: (count: Int, income: Double, notaryPortion: Double, taxablePortion: Double) {
-        let cal = Calendar.current
-        let done = data.signings.filter { $0.status == .done && cal.isDate($0.date, equalTo: Date(), toGranularity: .year) }
-        return (
-            done.count,
-            done.reduce(0) { $0 + $1.fee },
-            done.reduce(0) { $0 + $1.notaryFeePortion },
-            done.reduce(0) { $0 + $1.taxablePortion }
         )
     }
 
@@ -450,6 +445,12 @@ struct SigningListView: View {
             // 🔴挂载点铁律：修饰符挂 NavigationStack 里面的内容上（同 TodayView，11-27三轮实锤）
             .navigationTitle(L("Signings", "签署单"))
             .toolbar {
+                // 健哥 2026-11-28①：左上角「公证所需文件」设置入口（长期配置，与新签署单解耦）
+                ToolbarItem(placement: .navigationBarLeading) {
+                    NavigationLink(destination: DocTemplateSettingsView(data: $data)) {
+                        Image(systemName: "doc.badge.gearshape")
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button { if TrialStore.gate() { showAdd = true } } label: { Image(systemName: "plus") }
                 }
@@ -465,7 +466,6 @@ struct SigningListView: View {
         List {
             overdueWarnSection
             monthSection
-            yearSection
             allSigningsSection
         }
     }
@@ -510,7 +510,7 @@ struct SigningListView: View {
                 .foregroundColor(.indigo)
             Text(L("No signings yet", "还没有签署单"))
                 .font(.headline)
-            Text(L("Log your first signing: client, fee, notarial acts.", "记第一单：客户、费用、公证行为。"))
+            Text(L("Log your first signing: client, fee, notary documents.", "记第一单：客户、费用、公证所需文件。"))
                 .font(.footnote)
                 .foregroundColor(.secondary)
             Spacer()
@@ -539,21 +539,6 @@ struct SigningListView: View {
                     .font(.footnote)
                     .foregroundColor(.orange)
             }
-        }
-    }
-
-    private var yearSection: some View {
-        Section(L("Year to Date", "今年累计")) {
-            HStack {
-                StatCell(L("Signings", "单数"), "\(yearSummary.count)")
-                StatCell(L("Income", "收入"), "$" + String(format: "%.0f", yearSummary.income))
-            }
-            HStack(spacing: 16) {
-                Label(L("Notary (SE-exempt) $", "公证费（免SE税）$") + String(format: "%.0f", yearSummary.notaryPortion), systemImage: "checkmark.shield")
-                    .foregroundColor(.green)
-                Label(L("Service $", "服务费 $") + String(format: "%.0f", yearSummary.taxablePortion), systemImage: "doc.text")
-            }
-            .font(.caption)
         }
     }
 
@@ -619,10 +604,15 @@ struct SigningDetailView: View {
                     LabeledRow(L("Overdue", "逾期"), L("\(current.unpaidDays) days unpaid", "\(current.unpaidDays) 天未收"))
                 }
             }
-            Section(L("Notarial Acts", "公证行为")) {
-                LabeledRow(L("Loan docs", "借款文件"), "\(current.borrowDocs)")
-                LabeledRow(L("Trust docs", "信托文件"), "\(current.trustDocs)")
-                LabeledRow(L("Other", "其他"), "\(current.otherDocs)")
+            Section(L("Notary Documents", "公证所需文件")) {
+                if current.effectiveDocItems.isEmpty {
+                    Text(L("None recorded", "未记录"))
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                }
+                ForEach(current.effectiveDocItems) { line in
+                    LabeledRow(line.name, "×\(line.count)")
+                }
             }
             // 健哥令③：后续处理——未收→标记已收（清账龄）；已收→改回未收
             if current.status == .done {
@@ -696,6 +686,18 @@ struct ClientListView: View {
     @Binding var data: Store.Data
     @State private var showAdd = false
 
+    /// 健哥 2026-11-28②：今年累计从签署单页移到客户页顶端（报税直用）
+    var yearSummary: (count: Int, income: Double, notaryPortion: Double, taxablePortion: Double) {
+        let cal = Calendar.current
+        let done = data.signings.filter { $0.status == .done && cal.isDate($0.date, equalTo: Date(), toGranularity: .year) }
+        return (
+            done.count,
+            done.reduce(0) { $0 + $1.fee },
+            done.reduce(0) { $0 + $1.notaryFeePortion },
+            done.reduce(0) { $0 + $1.taxablePortion }
+        )
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -737,6 +739,7 @@ struct ClientListView: View {
 
     private var clientList: some View {
         List {
+            yearSection
             ForEach(data.clients) { c in
                 NavigationLink(destination: ClientDetailView(client: c, data: $data)) {
                     VStack(alignment: .leading, spacing: 2) {
@@ -757,6 +760,22 @@ struct ClientListView: View {
                 guard TrialStore.gate() else { return }
                 data.clients.remove(atOffsets: offsets); Store.save(data)
             }
+        }
+    }
+
+    // 健哥 2026-11-28②：今年累计（从签署单页移来，客户页顶端）
+    private var yearSection: some View {
+        Section(L("Year to Date", "今年累计")) {
+            HStack {
+                StatCell(L("Signings", "单数"), "\(yearSummary.count)")
+                StatCell(L("Income", "收入"), "$" + String(format: "%.0f", yearSummary.income))
+            }
+            HStack(spacing: 16) {
+                Label(L("Notary (SE-exempt) $", "公证费（免SE税）$") + String(format: "%.0f", yearSummary.notaryPortion), systemImage: "checkmark.shield")
+                    .foregroundColor(.green)
+                Label(L("Service $", "服务费 $") + String(format: "%.0f", yearSummary.taxablePortion), systemImage: "doc.text")
+            }
+            .font(.caption)
         }
     }
 }
@@ -1035,7 +1054,7 @@ enum NTExporter {
         l.append(L("Total: $", "总费用：$") + String(format: "%.0f", s.fee) + L(" (notary SE-exempt $", "（公证费免税 $") + String(format: "%.0f", s.notaryFeePortion) + L(" + service taxable $", " + 服务费应税 $") + String(format: "%.0f", s.taxablePortion) + L(")", "）"))
         if s.tripFee > 0 { l.append(L("Trip fee: $", "跑趟费：$") + String(format: "%.0f", s.tripFee)) }
         l.append(L("Status: \(s.status == .done ? "Done" : s.status == .noshow ? "No-show" : "Scheduled") · \(s.paid ? "Paid" : "Unpaid")", "状态：\(s.status == .done ? "完成" : s.status == .noshow ? "没成功" : "已约") · \(s.paid ? "已收" : "未收")"))
-        l.append(L("Notarial acts: loan \(s.borrowDocs) / trust \(s.trustDocs) / other \(s.otherDocs)", "公证行为：借款 \(s.borrowDocs) / 信托 \(s.trustDocs) / 其他 \(s.otherDocs)"))
+        l.append(L("Notary documents: ", "公证所需文件：") + (s.effectiveDocItems.isEmpty ? L("none", "无") : s.effectiveDocItems.map { "\($0.name)×\($0.count)" }.joined(separator: " / ")))
         if !s.note.isEmpty { l.append(L("Note: \(s.note)", "备注：\(s.note)")) }
         return l.joined(separator: "\n")
     }

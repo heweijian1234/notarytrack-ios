@@ -17,9 +17,8 @@ struct SigningEditor: View {
     @State private var minutes = 60
     @State private var buffer = 15
     @State private var serviceType: ServiceType = .loan
-    @State private var borrowDocs = 0         // 健哥令①：默认 0
-    @State private var trustDocs = 0
-    @State private var otherDocs = 0
+    // 健哥 2026-11-28：公证所需文件清单（按类型带出模板，份数在此填）——取代旧三计数
+    @State private var docItems: [DocLine] = []
     @State private var remindMe = false       // 健哥令①：默认关，用户自己开
     @State private var remindMinutesBefore = 30 // 健哥令①：分钟制（30/45/60/120/180/240/360/600）
     @State private var notaryFeeHint = L("Flat fee usually $0", "打包价通常 $0")
@@ -63,6 +62,7 @@ struct SigningEditor: View {
                     }
                     .onChange(of: serviceType) { t in
                         applyTypeDefaults(t)
+                        loadDocTemplate(for: t)
                     }
                     Text(L("Suggested: ~\(minutes) min at the table · notary fee \(notaryFeeHint)", "建议：桌上约 \(minutes) 分钟 · 公证费 \(notaryFeeHint)"))
                         .font(.caption)
@@ -114,10 +114,28 @@ struct SigningEditor: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                Section(L("Notarial Acts", "公证行为")) {
-                    Stepper(L("Loan docs: \(borrowDocs)", "借款文件：\(borrowDocs)"), value: $borrowDocs, in: 0...20)
-                    Stepper(L("Trust docs: \(trustDocs)", "信托文件：\(trustDocs)"), value: $trustDocs, in: 0...20)
-                    Stepper(L("Misc acts: \(otherDocs)", "其他行为：\(otherDocs)"), value: $otherDocs, in: 0...20)
+                // 健哥 2026-11-28：改名「公证所需文件」+ 核查提示；清单按类型带出，份数在此填
+                Section {
+                    if docItems.isEmpty {
+                        Text(L("No template for this type — set it up in Signings → Notary Documents.", "该类型没配清单——去签署单页「公证所需文件」设置。"))
+                            .font(.footnote)
+                            .foregroundColor(.secondary)
+                    }
+                    ForEach($docItems) { $line in
+                        Stepper(value: $line.count, in: 0...99) {
+                            HStack {
+                                Text(line.name)
+                                Spacer()
+                                if line.count > 0 {
+                                    Text("\(line.count)").foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                    }
+                } header: {
+                    Text(L("Notary Documents", "公证所需文件"))
+                } footer: {
+                    Text(L("Loaded from your type template — verify what this case actually needs.", "来自你配置的类型清单——请核查该案实际所需。"))
                 }
                 Section(L("Notes", "备注")) {
                     TextField(L("Order # / special instructions…", "订单号 / 特殊说明…"), text: $note, axis: .vertical)
@@ -139,18 +157,34 @@ struct SigningEditor: View {
                 if clientId == nil {
                     clientId = preselectedClientId ?? data.clients.first?.id
                 }
+                if docItems.isEmpty {
+                    loadDocTemplate(for: serviceType)
+                }
             }
+        }
+    }
+
+    /// 健哥 2026-11-28：按业务类型带出文件清单模板（份数清零，单上现填）
+    /// 配置过（含故意清空）完全听用户的；没配置过才给行业预设
+    private func loadDocTemplate(for t: ServiceType) {
+        if let saved = data.settings.docTemplates[t.rawValue] {
+            docItems = saved.map { DocLine(name: $0, count: 0) }
+        } else {
+            docItems = DocTemplateSettingsView.defaultTemplate(for: t).map { DocLine(name: $0, count: 0) }
         }
     }
 
 
     private func save() {
         guard let cid = clientId else { return }
+        // 11-28：清单存 docItems；三计数只留兼容旧数据（填总数，旧读法不断）
+        let total = docItems.reduce(0) { $0 + $1.count }
         data.signings.append(Signing(clientId: cid, date: date, address: address, fee: fee,
                                      notaryFeePortion: notaryFeePortion, tripFee: tripFee,
                                      minutes: minutes, driveBufferMinutes: buffer,
-                                     serviceType: serviceType, borrowDocs: borrowDocs,
-                                     trustDocs: trustDocs, otherDocs: otherDocs, note: note))
+                                     serviceType: serviceType, borrowDocs: total,
+                                     trustDocs: 0, otherDocs: 0, note: note,
+                                     docItems: docItems))
         Store.save(data)
         scheduleLocalReminder()
         dismiss()

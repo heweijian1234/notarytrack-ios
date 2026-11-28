@@ -4,26 +4,40 @@ import Foundation
 // A1账龄/A2付款速度/A3净利/A5时薪地板/A6评级/A9回访 = 计算属性+视图层）
 
 enum ServiceType: String, Codable, CaseIterable {
+    // 健哥 2026-11-28：「其他」改名「自定义」并排列第一（rawValue 是持久化键，只改显示不动键，防旧数据解码炸）
+    case other = "其他"
     case loan = "贷款签署"
     case general = "普通公证"
     case apostille = "海牙认证"
     case hospital = "医院/机构"
     case estate = "遗产规划"
-    case other = "其他"
 
     var emoji: String {
-        switch self { case .loan: return "🏠"; case .general: return "📝"; case .apostille: return "🌐"; case .hospital: return "🏥"; case .estate: return "📜"; case .other: return "🐾" }
+        switch self { case .other: return "🧩"; case .loan: return "🏠"; case .general: return "📝"; case .apostille: return "🌐"; case .hospital: return "🏥"; case .estate: return "📜" }
     }
 
     var display: String {
         switch self {
+        case .other: return L("Custom", "自定义")
         case .loan: return L("Loan Signing", "贷款签署")
         case .general: return L("General Notary", "普通公证")
         case .apostille: return L("Apostille", "海牙认证")
         case .hospital: return L("Hospital/Facility", "医院/机构")
         case .estate: return L("Estate Planning", "遗产规划")
-        case .other: return L("Other", "其他")
         }
+    }
+}
+
+/// 健哥 2026-11-28：公证所需文件清单行（设置页自编名称，签署单上只填份数）
+struct DocLine: Codable, Identifiable, Equatable {
+    let id: UUID
+    var name: String
+    var count: Int
+
+    init(id: UUID = UUID(), name: String, count: Int = 0) {
+        self.id = id
+        self.name = name
+        self.count = count
     }
 }
 
@@ -69,6 +83,7 @@ struct Signing: Codable, Identifiable, Equatable {
     var paidDate: Date?         // A2/A6：收款日（算付款天数用）
     var completedDate: Date?    // A1：完成日（账龄计时起点；nil=用 date）
     var note: String
+    var docItems: [DocLine]?    // 11-28 公证所需文件清单（nil=旧数据→从 borrow/trust/other 三计数换算显示）
 
     enum Status: String, Codable { case scheduled, done, noshow
         var display: String {
@@ -81,7 +96,7 @@ struct Signing: Codable, Identifiable, Equatable {
          driveBufferMinutes: Int = 15, serviceType: ServiceType = .loan,
          borrowDocs: Int = 0, trustDocs: Int = 0, otherDocs: Int = 0,
          status: Status = .scheduled, paid: Bool = false, paidDate: Date? = nil,
-         completedDate: Date? = nil, note: String = "") {
+         completedDate: Date? = nil, note: String = "", docItems: [DocLine]? = nil) {
         self.id = id
         self.clientId = clientId
         self.date = date
@@ -100,7 +115,21 @@ struct Signing: Codable, Identifiable, Equatable {
         self.paidDate = paidDate
         self.completedDate = completedDate
         self.note = note
+        self.docItems = docItems
     }
+
+    /// 11-28 显示统一走这里：新单读 docItems；旧单 docItems 为 nil 时从三个计数换算成清单行
+    var effectiveDocItems: [DocLine] {
+        if let d = docItems, !d.isEmpty { return d }
+        var lines: [DocLine] = []
+        if borrowDocs > 0 { lines.append(DocLine(name: L("Loan docs", "借款文件"), count: borrowDocs)) }
+        if trustDocs > 0 { lines.append(DocLine(name: L("Trust docs", "信托文件"), count: trustDocs)) }
+        if otherDocs > 0 { lines.append(DocLine(name: L("Other acts", "其他行为"), count: otherDocs)) }
+        return lines
+    }
+
+    /// 文件总份数（月报/年累计的"行为数"数据源，新旧单统一）
+    var totalDocCount: Int { effectiveDocItems.reduce(0) { $0 + $1.count } }
 
     // MARK: 计算属性（A1/A3/A5 的数据基础）
 
@@ -128,9 +157,22 @@ struct Signing: Codable, Identifiable, Equatable {
 
 }
 
-// MARK: - 设置（预留：A3耗材/A5时薪已砍11-24；后续Pro设置用）
+// MARK: - 设置（11-28：公证所需文件清单模板按业务类型存放——健哥长期配置，签署单临时引用）
 
 struct AppSettings: Codable, Equatable {
+    /// 键 = ServiceType.rawValue；值 = 该类型的默认文件清单（纯名称，份数在单子上填）
+    var docTemplates: [String: [String]] = [:]
+
+    init(docTemplates: [String: [String]] = [:]) {
+        self.docTemplates = docTemplates
+    }
+
+    // 🔴旧档 settings 是空对象{}，合成解码遇缺键会整体抛错→load()回落失败→数据清空；
+    // 手写容错：缺键/类型不对都给默认值，绝不让设置字段炸掉整个存档。
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        docTemplates = (try? c.decode([String: [String]].self, forKey: .docTemplates)) ?? [:]
+    }
 }
 
 // MARK: - 委托证（N5：到期提醒，存全局设置）
@@ -165,6 +207,11 @@ enum Store {
         var signings: [Signing] = []
         var commission: Commission? = nil
         var settings: AppSettings = AppSettings()
+    }
+
+    /// 某业务类型的文件清单模板（没配置过给空——设置页里现编）
+    static func docTemplate(for type: ServiceType, in data: Data) -> [String] {
+        data.settings.docTemplates[type.rawValue] ?? []
     }
 
     static func load() -> Data {
