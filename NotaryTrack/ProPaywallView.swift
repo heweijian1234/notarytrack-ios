@@ -13,6 +13,20 @@ struct ProPaywallView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 20) {
+                // 🔴二轮④：iOS 26 导航栏偶尔不渲染=「暂不」按钮一起消失→退不出去。
+                // 关闭按钮放内容区左上角，不依赖导航栏，必显。
+                HStack {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.leading, 4)
+                    Spacer()
+                }
+                .frame(height: 36)
                 Image(systemName: "lock.open.circle.fill")
                     .font(.system(size: 56))
                     .foregroundColor(.indigo)
@@ -61,7 +75,7 @@ struct ProPaywallView: View {
                 .font(.subheadline)
                 Spacer()
             }
-            .padding(.top, 40)
+            .padding(.top, 16)
             .navigationTitle(L("Pro", "Pro"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

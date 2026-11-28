@@ -162,9 +162,12 @@ struct Signing: Codable, Identifiable, Equatable {
 struct AppSettings: Codable, Equatable {
     /// 键 = ServiceType.rawValue；值 = 该类型的默认文件清单（纯名称，份数在单子上填）
     var docTemplates: [String: [String]] = [:]
+    /// 健哥 2026-11-28 二轮②：自定义业务类型的名字（如"离婚公证"——相当于自己新增业务类型）
+    var customTypeName: String = ""
 
-    init(docTemplates: [String: [String]] = [:]) {
+    init(docTemplates: [String: [String]] = [:], customTypeName: String = "") {
         self.docTemplates = docTemplates
+        self.customTypeName = customTypeName
     }
 
     // 🔴旧档 settings 是空对象{}，合成解码遇缺键会整体抛错→load()回落失败→数据清空；
@@ -172,6 +175,16 @@ struct AppSettings: Codable, Equatable {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         docTemplates = (try? c.decode([String: [String]].self, forKey: .docTemplates)) ?? [:]
+        customTypeName = (try? c.decode(String.self, forKey: .customTypeName)) ?? ""
+    }
+
+    /// 类型显示名（自定义=用户起的名，没起名回落"自定义"）
+    func typeName(_ t: ServiceType) -> String {
+        if t == .other {
+            let n = customTypeName.trimmingCharacters(in: .whitespaces)
+            return n.isEmpty ? ServiceType.other.display : n
+        }
+        return t.display
     }
 }
 

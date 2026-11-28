@@ -8,6 +8,9 @@ struct DocTemplateSettingsView: View {
     @Binding var data: Store.Data
     @State private var type: ServiceType = .loan
     @State private var newDocName = ""
+    // 二轮②：自定义业务的名称（输入框绑定，离开即存）
+    @State private var customName: String = ""
+    @FocusState private var customNameFocused: Bool
 
     /// 当前类型的清单（没配置过给行业常见预设，第一次进来就能看到样子）
     private var docs: [String] {
@@ -29,13 +32,23 @@ struct DocTemplateSettingsView: View {
             Section {
                 Picker(L("Business type", "业务类型"), selection: $type) {
                     ForEach(ServiceType.allCases, id: \.self) { t in
-                        Text("\(t.emoji) \(t.display)").tag(t)
+                        Text("\(t.emoji) \(data.settings.typeName(t))").tag(t)
                     }
+                }
+                // 二轮②：选「自定义」= 自己新增一个业务类型，给它起名
+                if type == .other {
+                    TextField(L("Custom business name (e.g. Divorce notarization)", "业务名称（如：离婚公证）"), text: $customName)
+                        .focused($customNameFocused)
+                        .onSubmit(saveCustomName)
                 }
             } header: {
                 Text(L("Pick a type, then edit its document list", "选类型，编它对应的文件清单"))
             } footer: {
-                Text(L("When you pick this type on a new signing, this list appears for counting. Always verify what the case actually needs.", "新签署单选这个类型时，会带出这份清单让你填份数。请核查该案实际所需。"))
+                if type == .other {
+                    Text(L("Name your own business type — it shows up in the type picker everywhere.", "给你的自定义业务起名——名字会在所有类型选择处生效。"))
+                } else {
+                    Text(L("When you pick this type on a new signing, this list appears for counting. Always verify what the case actually needs.", "新签署单选这个类型时，会带出这份清单让你填份数。请核查该案实际所需。"))
+                }
             }
 
             Section(L("Required documents", "公证所需文件")) {
@@ -67,6 +80,23 @@ struct DocTemplateSettingsView: View {
         }
         .navigationTitle(L("Notary Documents", "公证所需文件"))
         .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: type) { t in
+            customName = data.settings.customTypeName
+            // 收起键盘：切走自定义时把没存的名字落盘
+            if t != .other, customNameFocused {
+                saveCustomName()
+            }
+            customNameFocused = false
+        }
+        .onAppear {
+            customName = data.settings.customTypeName
+        }
+    }
+
+    /// 二轮②：自定义业务名落盘
+    private func saveCustomName() {
+        data.settings.customTypeName = customName.trimmingCharacters(in: .whitespaces)
+        Store.save(data)
     }
 
     /// 按下标改名单（TextField 双向绑定），改完即写回存储

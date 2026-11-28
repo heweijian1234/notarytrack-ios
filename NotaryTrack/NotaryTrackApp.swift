@@ -36,20 +36,25 @@ struct RootView: View {
                 .padding(.horizontal, 12).padding(.vertical, 8)
                 .background(.indigo)
             }
+            // 二轮⑤：左右滑切换页面——TabView 用 .page 翻页样式（带手势滑动），底部导航条自绘
             TabView(selection: $tab) {
-                TodayView(data: $data)
-                    .tabItem { Label(L("Today", "今日"), systemImage: "calendar") }
-                    .tag(0)
-                SigningListView(data: $data)
-                    .tabItem { Label(L("Signings", "签署单"), systemImage: "doc.text") }
-                    .tag(1)
-                ClientListView(data: $data)
-                    .tabItem { Label(L("Clients", "客户"), systemImage: "person.2") }
-                    .tag(2)
-                FeedbackView()
-                    .tabItem { Label(L("Me", "我的"), systemImage: "person.crop.circle") }
-                    .tag(3)
+                TodayView(data: $data).tag(0)
+                SigningListView(data: $data).tag(1)
+                ClientListView(data: $data).tag(2)
+                FeedbackView().tag(3)
             }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+
+            // 自绘导航条（点按切换 + 左右滑手势并存）
+            HStack(spacing: 0) {
+                tabBarButton(icon: "calendar", label: L("Today", "今日"), idx: 0)
+                tabBarButton(icon: "doc.text", label: L("Signings", "签署单"), idx: 1)
+                tabBarButton(icon: "person.2", label: L("Clients", "客户"), idx: 2)
+                tabBarButton(icon: "person.crop.circle", label: L("Me", "我的"), idx: 3)
+            }
+            .padding(.top, 6)
+            .padding(.bottom, 2)
+            .background(.bar)
         }
         .onAppear {
             data = Store.load()
@@ -61,6 +66,20 @@ struct RootView: View {
         }
         .sheet(isPresented: $showProPaywall) {
             ProPaywallView()
+        }
+    }
+
+    /// 二轮⑤：自绘底部导航按钮
+    private func tabBarButton(icon: String, label: String, idx: Int) -> some View {
+        Button {
+            withAnimation { tab = idx }
+        } label: {
+            VStack(spacing: 2) {
+                Image(systemName: icon).font(.system(size: 20))
+                Text(label).font(.caption2)
+            }
+            .frame(maxWidth: .infinity)
+            .foregroundColor(tab == idx ? .indigo : .secondary)
         }
     }
 }
@@ -126,12 +145,14 @@ struct TodayView: View {
             .navigationTitle(L("Today", "今日"))
             .toolbar {
                 // 健哥 2026-11-28⑤：去掉「+新签署单」（签署单页已有，不重复），只留委托证入口
+                // 🔴第二轮修复：credentialing 不是合法 SF Symbol（原在 Menu 里不显形，独立按钮=白色占位点不动）→ 换 checkmark.seal
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
-                        if TrialStore.gate() {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { todaySheet = .commission }
-                        }
-                    } label: { Image(systemName: "credentialing") }
+                        if TrialStore.gate() { todaySheet = .commission }
+                    } label: {
+                        Image(systemName: "checkmark.seal")
+                            .foregroundColor(.indigo)
+                    }
                 }
             }
             .sheet(item: $todaySheet, onDismiss: { data = Store.load() }) { item in
@@ -261,7 +282,7 @@ struct SigningRow: View {
             }
             // 健哥 2026-11-28④：今日订单能看到业务类型 + 要带什么文件
             HStack(spacing: 8) {
-                Text("\(signing.serviceType.emoji) \(signing.serviceType.display)")
+                Text("\(signing.serviceType.emoji) \(data.settings.typeName(signing.serviceType))")
                     .font(.caption)
                     .foregroundColor(.indigo)
                 if !signing.effectiveDocItems.isEmpty {
@@ -359,12 +380,16 @@ struct SigningRowMetrics: View {
 struct SigningRowHeader: View {
     let s: Signing
     let clientName: String
+    var typeName: String = ""
 
     var body: some View {
         HStack {
             Text(clientName)
                 .font(.headline)
             Text(s.serviceType.emoji).font(.caption)
+            if !typeName.isEmpty {
+                Text(typeName).font(.caption2).foregroundColor(.secondary)
+            }
             if s.status == .noshow {
                 Text(L("No-show", "没来")).font(.caption2).foregroundColor(.red)
             }
@@ -393,7 +418,7 @@ struct SigningListRow: View {
     var body: some View {
         NavigationLink(destination: SigningDetailView(signing: s, data: $data)) {
             VStack(alignment: .leading, spacing: 2) {
-                SigningRowHeader(s: s, clientName: clientName)
+                SigningRowHeader(s: s, clientName: clientName, typeName: data.settings.typeName(s.serviceType))
                 SigningRowMetrics(s: s)
             }
         }
@@ -589,7 +614,7 @@ struct SigningDetailView: View {
             Section(L("This Signing", "本单")) {
                 LabeledRow(L("Date", "日期"), current.date.formatted(date: .long, time: .shortened))
                 if !current.address.isEmpty { LabeledRow(L("Location", "地点"), current.address) }
-                LabeledRow(L("Type", "类型"), current.serviceType.display)
+                LabeledRow(L("Type", "类型"), data.settings.typeName(current.serviceType))
                 LabeledRow(L("Total fee", "总费用"), "$" + String(format: "%.0f", current.fee))
                 // A4 拆分显示
                 LabeledRow(L("├ Notary (exempt)", "├ 公证费（免税）"), "$" + String(format: "%.0f", current.notaryFeePortion))
@@ -1050,7 +1075,7 @@ enum NTExporter {
         l.append(L("【Signing】\(client?.company ?? L("Unknown client", "未知客户"))", "【签署单】\(client?.company ?? "未知客户")"))
         l.append(L("Time: \(df.string(from: s.date))", "时间：\(df.string(from: s.date))"))
         if !s.address.isEmpty { l.append(L("Location: \(s.address)", "地点：\(s.address)")) }
-        l.append(L("Type: ", "类型：") + s.serviceType.display)
+        l.append(L("Type: ", "类型：") + settings.typeName(s.serviceType))
         l.append(L("Total: $", "总费用：$") + String(format: "%.0f", s.fee) + L(" (notary SE-exempt $", "（公证费免税 $") + String(format: "%.0f", s.notaryFeePortion) + L(" + service taxable $", " + 服务费应税 $") + String(format: "%.0f", s.taxablePortion) + L(")", "）"))
         if s.tripFee > 0 { l.append(L("Trip fee: $", "跑趟费：$") + String(format: "%.0f", s.tripFee)) }
         l.append(L("Status: \(s.status == .done ? "Done" : s.status == .noshow ? "No-show" : "Scheduled") · \(s.paid ? "Paid" : "Unpaid")", "状态：\(s.status == .done ? "完成" : s.status == .noshow ? "没成功" : "已约") · \(s.paid ? "已收" : "未收")"))

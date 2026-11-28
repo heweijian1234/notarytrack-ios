@@ -54,10 +54,10 @@ struct SigningEditor: View {
                     }
                 }
                 Section(L("Time & Place", "时间与地点")) {
-                    // A8 服务类型
+                    // A8 服务类型（自定义=用户在设置页起的业务名，二轮②）
                     Picker(L("Type", "类型"), selection: $serviceType) {
                         ForEach(ServiceType.allCases, id: \.self) { t in
-                            Text("\(t.emoji) \(t.display)").tag(t)
+                            Text("\(t.emoji) \(data.settings.typeName(t))").tag(t)
                         }
                     }
                     .onChange(of: serviceType) { t in
@@ -90,13 +90,15 @@ struct SigningEditor: View {
                             .foregroundColor(.secondary)
                     }
                 }
-                Section(L("Fees", "费用")) {
+                Section {
                     HStack {
                         Text(L("Total fee $", "总费用 $"))
                         TextField("0", value: $fee, format: .number)
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                     }
+                    Text(L("What the client pays for the whole job, e.g. loan signing package $150.", "客户为这单付的全部，例：贷款签署打包价 $150。"))
+                        .font(.caption).foregroundColor(.secondary)
                     // A4 公证费拆分
                     HStack {
                         Text(L("Notary portion $ (SE-exempt)", "公证费 $（免SE税）"))
@@ -104,15 +106,22 @@ struct SigningEditor: View {
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                     }
+                    Text(L("State-set price × signature count, e.g. 10 signatures × $15 = $150. Exempt from self-employment tax.", "州定价×签名数，例：10个签名 × $15 = $150。免自雇税。"))
+                        .font(.caption).foregroundColor(.secondary)
                     HStack {
                         Text(L("Trip fee $", "跑趟费 $"))
                         TextField("0", value: $tripFee, format: .number)
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                     }
+                    Text(L("Extra drive charges: no-show re-visit, canceled on arrival, long distance.", "额外跑腿钱：对方没来要二次上门、到场被取消、跑太远。"))
+                        .font(.caption).foregroundColor(.secondary)
                     Text(L("Notary portion is exempt from self-employment tax (IRC §1402).", "公证费部分免自雇税（IRC §1402）。"))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(.caption).foregroundColor(.secondary)
+                } header: {
+                    Text(L("Fees", "费用"))
+                } footer: {
+                    Text(L("Total = notary + service. Trip fee is billed on top when applicable.", "总费用 = 公证费 + 服务费。跑趟费视情况额外计。"))
                 }
                 // 健哥 2026-11-28：改名「公证所需文件」+ 核查提示；清单按类型带出，份数在此填
                 Section {
