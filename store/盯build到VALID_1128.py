@@ -11,7 +11,7 @@ KEY_ID = "L3UHT69Y77"
 ISSUER_ID = "98812827-46d0-4c8f-9b91-35d4f783e6df"
 P8_PATH = r"E:\AI-Projects\个人成长\50-Skills\密钥\苹果\AuthKey_L3UHT69Y77.p8"
 APP_ID = "6832398956"   # NotaryTrack
-MIN_BUILD = 72          # 只认比这新的包（今天上传的应该是 74：push run 73 只出包，dispatch run 74 传 TF）
+MIN_BUILD = 74          # 只认比这新的包（二轮包应该是 75：push run 75 出包，dispatch run 76 传 TF）
 
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 from cryptography.hazmat.primitives.asymmetric import ec

@@ -143,6 +143,8 @@ struct TodayView: View {
             // NavigationStack 【里面】的内容上（G仓结构，真机验证好使）；挂在 Stack 外面
             // iOS 26 会把导航栏整个不渲染（标题+号全消失，Me页单根Form不受影响所以正常）。
             .navigationTitle(L("Today", "今日"))
+            // 健哥 2026-11-28 三轮①：标题居中——inline 模式导航标题天然居中（大标题模式必然左对齐）
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 // 健哥 2026-11-28⑤：去掉「+新签署单」（签署单页已有，不重复），只留委托证入口
                 // 🔴第二轮修复：credentialing 不是合法 SF Symbol（原在 Menu 里不显形，独立按钮=白色占位点不动）→ 换 checkmark.seal
@@ -469,6 +471,7 @@ struct SigningListView: View {
             }
             // 🔴挂载点铁律：修饰符挂 NavigationStack 里面的内容上（同 TodayView，11-27三轮实锤）
             .navigationTitle(L("Signings", "签署单"))
+            .navigationBarTitleDisplayMode(.inline)   // 健哥三轮①：标题居中
             .toolbar {
                 // 健哥 2026-11-28①：左上角「公证所需文件」设置入口（长期配置，与新签署单解耦）
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -734,6 +737,7 @@ struct ClientListView: View {
             }
             // 🔴挂载点铁律：修饰符挂 NavigationStack 里面的内容上（同 TodayView，11-27三轮实锤）
             .navigationTitle(L("Clients", "客户"))
+            .navigationBarTitleDisplayMode(.inline)   // 健哥三轮①：标题居中
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button { if TrialStore.gate() { showAdd = true } } label: { Image(systemName: "plus") }
